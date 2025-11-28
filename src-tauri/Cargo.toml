@@ -2,7 +2,7 @@
 name = "popcorn-hero"
 version = "0.1.0"
 description = "Discover and share your favorite movies with yours friends!"
-authors = ["Silbad"]
+authors = ["devbit.me"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
