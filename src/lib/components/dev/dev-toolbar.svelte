@@ -9,11 +9,11 @@
   import * as ButtonGroup from "$lib/components/ui/button-group/index.js";
 
   const isEnabled = dev && (config.devToolbar?.enabled ?? true);
-  const HOVER_DELAY = 2000;
-  const STORAGE_KEY = "devToolbar:pinned";
+  const hoverDelay = config.devToolbar?.hoverDelay ?? 1500;
+  const storageKey = "devToolbar:pinned";
 
   // Initialize from localStorage
-  const initialPinned = browser && localStorage.getItem(STORAGE_KEY) === "true";
+  const initialPinned = browser && localStorage.getItem(storageKey) === "true";
 
   // State
   let isPinned = $state(initialPinned);
@@ -36,7 +36,7 @@
   // Persist isPinned to localStorage
   $effect(() => {
     if (browser) {
-      localStorage.setItem(STORAGE_KEY, String(isPinned));
+      localStorage.setItem(storageKey, String(isPinned));
     }
   });
 
@@ -72,7 +72,7 @@
 
   function handleMouseLeave() {
     if (isPinned) return;
-    hideTimeout = setTimeout(hide, HOVER_DELAY);
+    hideTimeout = setTimeout(hide, hoverDelay);
   }
 
   function togglePinned() {
