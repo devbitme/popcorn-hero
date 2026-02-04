@@ -4,69 +4,92 @@
   import UserCog from "@lucide/svelte/icons/user-cog";
   import { Spring } from "svelte/motion";
   import config from "$/popcorn-hero.config.js";
-  import { dev } from "$app/environment";
+  import { browser, dev } from "$app/environment";
   import { Button } from "$lib/components/ui/button/index.js";
   import * as ButtonGroup from "$lib/components/ui/button-group/index.js";
 
   const isEnabled = dev && (config.devToolbar?.enabled ?? true);
+  const HOVER_DELAY = 2000;
+  const STORAGE_KEY = "devToolbar:pinned";
 
-  let isPinned = $state(false);
-  let isVisible = $state(false);
-  let hideTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Initialize from localStorage
+  const initialPinned = browser && localStorage.getItem(STORAGE_KEY) === "true";
 
-  const HOVER_DELAY = 2000; // 2 seconds like Astro
+  // State
+  let isPinned = $state(initialPinned);
+  let hideTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
 
-  // Spring animation with bounce effect like Astro's cubic-bezier(0.485, -0.050, 0.285, 1.505)
-  const position = new Spring(-40, {
+  // Spring animations
+  const position = new Spring(initialPinned ? 0 : -40, {
     stiffness: 0.08,
     damping: 0.25,
   });
 
-  const opacity = new Spring(0.2, {
+  const opacity = new Spring(initialPinned ? 1 : 0.2, {
     stiffness: 0.1,
     damping: 0.5,
   });
 
-  function handleMouseEnter() {
-    if (isPinned) return;
+  // Derived state: toolbar is hidden when position is below threshold
+  const isHidden = $derived(position.current < -20);
+
+  // Persist isPinned to localStorage
+  $effect(() => {
+    if (browser) {
+      localStorage.setItem(STORAGE_KEY, String(isPinned));
+    }
+  });
+
+  // Cleanup timeout on component destroy
+  $effect(() => {
+    return () => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+    };
+  });
+
+  function clearHideTimeout() {
     if (hideTimeout) {
       clearTimeout(hideTimeout);
       hideTimeout = null;
     }
-    isVisible = true;
+  }
+
+  function show() {
     position.target = 0;
     opacity.target = 1;
   }
 
+  function hide() {
+    position.target = -40;
+    opacity.target = 0.2;
+  }
+
+  function handleMouseEnter() {
+    if (isPinned) return;
+    clearHideTimeout();
+    show();
+  }
+
   function handleMouseLeave() {
     if (isPinned) return;
-    hideTimeout = setTimeout(() => {
-      isVisible = false;
-      position.target = -40;
-      opacity.target = 0.2;
-    }, HOVER_DELAY);
+    hideTimeout = setTimeout(hide, HOVER_DELAY);
   }
 
   function togglePinned() {
     isPinned = !isPinned;
     if (isPinned) {
-      // Pinned: always visible, full opacity
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-      isVisible = true;
-      position.target = 0;
-      opacity.target = 1;
+      clearHideTimeout();
+      show();
     } else {
-      // Unpinned: start autohide behavior
       handleMouseLeave();
     }
   }
+
+  // Common button styles
+  const iconButtonClass = "cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20";
 </script>
 
 {#if isEnabled}
-  <!-- Hitbox area to detect hover -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed bottom-0 left-1/2 -translate-x-1/2 z-999999 flex flex-col items-center cursor-pointer"
@@ -76,7 +99,7 @@
     <!-- Hitbox above the bar -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="w-full pointer-events-auto {isVisible ? 'h-0' : 'h-10.5'}"
+      class="w-full pointer-events-auto {isHidden ? 'h-10.5' : 'h-0'}"
       onmouseenter={handleMouseEnter}
     ></div>
 
@@ -89,7 +112,6 @@
       onmouseleave={handleMouseLeave}
     >
       <div class="h-full flex items-center">
-        <!-- OK Item -->
         <div
           class="flex justify-center items-center h-full"
           style:opacity={opacity.current}
@@ -102,19 +124,13 @@
                 alt="logo dev toolbar"
               />
             </Button>
-            <Button
-              class="cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20"
-            >
+            <Button class={iconButtonClass}>
               <UserCog class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button
-              class="cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20"
-            >
+            <Button class={iconButtonClass}>
               <ClipboardClock class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button
-              class="cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20 rounded-r-full"
-            >
+            <Button class="{iconButtonClass} rounded-r-full">
               <Github class="size-6" strokeWidth={1.5} />
             </Button>
           </ButtonGroup.Root>
