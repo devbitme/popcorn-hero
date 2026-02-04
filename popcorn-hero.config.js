@@ -1,7 +1,6 @@
-/** @type {{ devToolbar?: { enabled: boolean; autoHide: boolean } }} */
+/** @type {{ devToolbar?: { enabled: boolean } }} */
 export default {
 	devToolbar: {
 		enabled: true,
-		autoHide: true,
 	},
 };
