@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { info } from "@tauri-apps/plugin-log";
   import * as Icon from "svelte-flag-icons";
   import { buttonVariants } from "$lib/components/ui/button/index.js";
   import * as Popover from "$lib/components/ui/popover/index.js";
@@ -36,6 +37,7 @@
             <button
               class="w-full text-left rounded hover:bg-gray-200 cursor-pointer px-2 py-1"
               on:click={() => {
+                info(`[LanguageSwitcher] Changing locale from ${getLocale()} to ${locale}`);
                 setLocale(locale, { reload: true });
               }}
             >

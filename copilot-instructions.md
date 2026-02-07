@@ -146,6 +146,16 @@ When working on this project, keep in mind:
 4. Ensure all desktop capabilities are properly defined in `src-tauri/capabilities/`
 5. Follow Tauri best practices for security and performance
 
+### Logging
+All actions performed by the application must be systematically logged using `tauri-plugin-log`:
+
+1. **Frontend (Svelte/TypeScript)**: Use `info`, `warn`, `error`, `debug`, `trace` from `@tauri-apps/plugin-log` to log every significant action (navigation, user interactions, API calls, state changes, errors)
+2. **Backend (Rust)**: Use the `log` crate macros (`log::info!`, `log::warn!`, `log::error!`, `log::debug!`, `log::trace!`) to log every command execution, database operation, and error
+3. **Log format**: Prefix log messages with the component/module name in brackets, e.g. `[DevToolbar] Toolbar pinned`, `[LanguageSwitcher] Changing locale from en to fr`
+4. **Log targets**: Logs are persisted to the application log directory (LogDir), printed to stdout, and forwarded to the webview console via `attachConsole()`
+5. **Error handling**: Always log errors with `warn` or `error` level before handling them
+6. **New features**: When adding any new feature, action, or command, always include appropriate log statements
+
 ### Iroh & P2P Networking
 1. P2P connections should use Iroh for establishing direct connections when possible
 2. Implement proper error handling for relay server fallback scenarios

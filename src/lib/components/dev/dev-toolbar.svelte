@@ -2,7 +2,9 @@
   import ClipboardClock from "@lucide/svelte/icons/clipboard-clock";
   import Github from "@lucide/svelte/icons/github";
   import UserCog from "@lucide/svelte/icons/user-cog";
-  import { openUrl } from "@tauri-apps/plugin-opener";
+  import { appLogDir } from "@tauri-apps/api/path";
+  import { info, warn } from "@tauri-apps/plugin-log";
+  import { openPath, openUrl } from "@tauri-apps/plugin-opener";
   import { Spring } from "svelte/motion";
   import config from "$/popcorn-hero.config.js";
   import { browser, dev } from "$app/environment";
@@ -77,12 +79,29 @@
 
   function togglePinned() {
     isPinned = !isPinned;
+    info(`[DevToolbar] Toolbar ${isPinned ? "pinned" : "unpinned"}`);
     if (isPinned) {
       clearHideTimeout();
       show();
     } else {
       handleMouseLeave();
     }
+  }
+
+  async function openLogsFolder() {
+    try {
+      const logDir = await appLogDir();
+      info(`[DevToolbar] Opening logs folder: ${logDir}`);
+      await openPath(logDir);
+    } catch (e) {
+      warn(`[DevToolbar] Failed to open logs folder: ${e}`);
+    }
+  }
+
+  async function openGitHub() {
+    const url = "https://github.com/devbitme/popcorn-hero";
+    info(`[DevToolbar] Opening GitHub: ${url}`);
+    await openUrl(url);
   }
 
   // Common button styles
@@ -127,10 +146,10 @@
             <Button class={iconButtonClass}>
               <UserCog class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button class={iconButtonClass}>
+            <Button class={iconButtonClass} onclick={openLogsFolder}>
               <ClipboardClock class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button class="{iconButtonClass} rounded-r-full" onclick={() => openUrl("https://github.com/devbitme/popcorn-hero")}>
+            <Button class="{iconButtonClass} rounded-r-full" onclick={openGitHub}>
               <Github class="size-6" strokeWidth={1.5} />
             </Button>
           </ButtonGroup.Root>
