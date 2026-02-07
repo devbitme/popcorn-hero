@@ -2,6 +2,7 @@
   import ClipboardClock from "@lucide/svelte/icons/clipboard-clock";
   import Github from "@lucide/svelte/icons/github";
   import UserCog from "@lucide/svelte/icons/user-cog";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { Spring } from "svelte/motion";
   import config from "$/popcorn-hero.config.js";
   import { browser, dev } from "$app/environment";
@@ -65,7 +66,6 @@
   }
 
   function handleMouseEnter() {
-    if (isPinned) return;
     clearHideTimeout();
     show();
   }
@@ -120,7 +120,7 @@
             <Button class="cursor-pointer rounded-l-full px-2 group" onclick={togglePinned}>
               <img
                 src="./logo-dev-toolbar.svg"
-                class="size-6 transition-opacity duration-200 {isPinned ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}"
+                class="size-6 transition-opacity duration-200 {isPinned ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}"
                 alt="logo dev toolbar"
               />
             </Button>
@@ -130,7 +130,7 @@
             <Button class={iconButtonClass}>
               <ClipboardClock class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button class="{iconButtonClass} rounded-r-full">
+            <Button class="{iconButtonClass} rounded-r-full" onclick={() => openUrl("https://github.com/devbitme/popcorn-hero")}>
               <Github class="size-6" strokeWidth={1.5} />
             </Button>
           </ButtonGroup.Root>
