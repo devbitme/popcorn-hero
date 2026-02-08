@@ -18,5 +18,6 @@
   "user_success_created": "Account created successfully!",
   "user_success_unlocked": "Welcome back!",
   "user_account": "Account",
-  "user_settings": "Settings"
+  "user_settings": "Settings",
+  "user_logout": "Log out"
 }

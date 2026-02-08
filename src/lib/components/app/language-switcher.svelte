@@ -40,6 +40,13 @@
 			<DropdownMenu.Item>
 				<a href="/settings">{m.user_settings()}</a>
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Item
+				class="cursor-pointer"
+				onclick={() => currentUser.set(null)}
+			>
+				{m.user_logout()}
+			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 	{/if}
