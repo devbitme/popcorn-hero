@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
+	import { tick } from "svelte";
 	import { toast } from "svelte-sonner";
 	import * as Card from "$lib/components/ui/card";
 	import * as InputOTP from "$lib/components/ui/input-otp";
@@ -16,6 +17,14 @@
 	let pin = $state("");
 	let pinError = $state("");
 	let isSubmitting = $state(false);
+	let otpContainer: HTMLDivElement;
+
+	$effect(() => {
+		tick().then(() => {
+			const input = otpContainer?.querySelector("input");
+			input?.focus();
+		});
+	});
 
 	async function handleSubmit() {
 		if (pin.length !== 4) {
@@ -45,7 +54,7 @@
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
 	<div class="flex w-full max-w-sm flex-col items-center gap-6">
 		<img src="/logo-circle.svg" alt="Popcorn Hero" class="size-24" />
-		<Card.Root class="w-full">
+		<Card.Root class="w-full border-0 shadow-none rounded-none">
 		<Card.Header class="text-center">
 			<Card.Title class="text-2xl">{m.user_login_title({ username })}</Card.Title>
 			<Card.Description>{m.user_login_description()}</Card.Description>
@@ -60,7 +69,7 @@
 			>
 				<!-- PIN -->
 				<div class="space-y-2">
-					<div class="flex justify-center">
+					<div class="flex justify-center" bind:this={otpContainer}>
 						<InputOTP.Root
 							maxlength={4}
 							bind:value={pin}
