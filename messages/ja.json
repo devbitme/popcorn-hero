@@ -16,5 +16,7 @@
   "user_error_pin_invalid": "PINが無効です。もう一度お試しください。",
   "user_error_creation_failed": "アカウントの作成に失敗しました。",
   "user_success_created": "アカウントが正常に作成されました！",
-  "user_success_unlocked": "おかえりなさい！"
+  "user_success_unlocked": "おかえりなさい！",
+  "user_account": "アカウント",
+  "user_settings": "設定"
 }

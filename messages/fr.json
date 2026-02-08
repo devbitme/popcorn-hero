@@ -16,5 +16,7 @@
   "user_error_pin_invalid": "Code PIN invalide. Réessayez.",
   "user_error_creation_failed": "La création du compte a échoué.",
   "user_success_created": "Compte créé avec succès !",
-  "user_success_unlocked": "Bon retour !"
+  "user_success_unlocked": "Bon retour !",
+  "user_account": "Compte",
+  "user_settings": "Paramètres"
 }

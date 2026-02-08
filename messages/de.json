@@ -17,5 +17,7 @@
   "user_error_pin_invalid": "Ungültige PIN. Versuchen Sie es erneut.",
   "user_error_creation_failed": "Kontoerstellung fehlgeschlagen.",
   "user_success_created": "Konto erfolgreich erstellt!",
-  "user_success_unlocked": "Willkommen zurück!"
+  "user_success_unlocked": "Willkommen zurück!",
+  "user_account": "Konto",
+  "user_settings": "Einstellungen"
 }
