@@ -1,4 +1,20 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "hello_world": "Ciao {name}"
+  "hello_world": "Ciao {name}",
+  "user_create_title": "Crea il tuo account",
+  "user_create_description": "Scegli un nome utente e un PIN per iniziare.",
+  "user_login_title": "Bentornato, {username}!",
+  "user_login_description": "Inserisci il tuo PIN per sbloccare.",
+  "user_label_username": "Nome utente",
+  "user_label_pin": "Codice PIN",
+  "user_placeholder_username": "amante-di-popcorn",
+  "user_btn_create": "Crea account",
+  "user_btn_unlock": "Sblocca",
+  "user_error_username_required": "Il nome utente è obbligatorio.",
+  "user_error_username_invalid": "Solo lettere, numeri, trattini e underscore.",
+  "user_error_pin_incomplete": "Il PIN deve contenere 4 cifre.",
+  "user_error_pin_invalid": "PIN non valido. Riprova.",
+  "user_error_creation_failed": "Creazione dell'account fallita.",
+  "user_success_created": "Account creato con successo!",
+  "user_success_unlocked": "Bentornato!"
 }

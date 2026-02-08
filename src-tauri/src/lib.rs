@@ -1,3 +1,5 @@
+mod user;
+
 use tauri_plugin_log::{Target, TargetKind};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -27,7 +29,12 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            user::check_user_exists,
+            user::create_user,
+            user::verify_pin,
+        ])
         .setup(|_app| {
             log::info!("[App] Popcorn Hero started");
             Ok(())

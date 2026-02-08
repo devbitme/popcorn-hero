@@ -1,4 +1,20 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "hello_world": "Hello {name}"
+  "hello_world": "Hello {name}",
+  "user_create_title": "Create your account",
+  "user_create_description": "Choose a username and a PIN to get started.",
+  "user_login_title": "Welcome back, {username}!",
+  "user_login_description": "Enter your PIN to unlock.",
+  "user_label_username": "Username",
+  "user_label_pin": "PIN code",
+  "user_placeholder_username": "popcorn-lover",
+  "user_btn_create": "Create account",
+  "user_btn_unlock": "Unlock",
+  "user_error_username_required": "Username is required.",
+  "user_error_username_invalid": "Only letters, numbers, hyphens and underscores.",
+  "user_error_pin_incomplete": "PIN must be 4 digits.",
+  "user_error_pin_invalid": "Invalid PIN. Try again.",
+  "user_error_creation_failed": "Account creation failed.",
+  "user_success_created": "Account created successfully!",
+  "user_success_unlocked": "Welcome back!"
 }

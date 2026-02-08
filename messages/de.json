@@ -1,5 +1,21 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "example_message": "Guten Tag {username}",
-  "hello_world": "Guten Tag {name}"
+  "hello_world": "Guten Tag {name}",
+  "user_create_title": "Konto erstellen",
+  "user_create_description": "Wählen Sie einen Benutzernamen und eine PIN, um zu beginnen.",
+  "user_login_title": "Willkommen zurück, {username}!",
+  "user_login_description": "Geben Sie Ihre PIN ein, um fortzufahren.",
+  "user_label_username": "Benutzername",
+  "user_label_pin": "PIN-Code",
+  "user_placeholder_username": "popcorn-fan",
+  "user_btn_create": "Konto erstellen",
+  "user_btn_unlock": "Entsperren",
+  "user_error_username_required": "Benutzername ist erforderlich.",
+  "user_error_username_invalid": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche.",
+  "user_error_pin_incomplete": "Die PIN muss 4 Ziffern enthalten.",
+  "user_error_pin_invalid": "Ungültige PIN. Versuchen Sie es erneut.",
+  "user_error_creation_failed": "Kontoerstellung fehlgeschlagen.",
+  "user_success_created": "Konto erfolgreich erstellt!",
+  "user_success_unlocked": "Willkommen zurück!"
 }
