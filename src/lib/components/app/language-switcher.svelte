@@ -51,6 +51,7 @@
 				<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
 					<svelte:component
 						this={getFlagComponent(getLocale())}
+						class="size-5!"
 					/>
 				</Button>
 			{/snippet}
