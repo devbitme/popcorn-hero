@@ -6,6 +6,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { getLocale, locales, setLocale } from "$lib/paraglide/runtime.js";
+	import { currentUser } from "$lib/stores/user";
 
 	// Exceptions for locale to flag icon mapping
 	const flagExceptions: Record<string, string> = {
@@ -23,10 +24,11 @@
 
 <div class="fixed top-4 right-8 z-50 flex items-center gap-2">
 	<!-- Avatar / Account Menu -->
+	{#if $currentUser}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
-				<Button {...props} variant="ghost" size="icon-sm" class="cursor-pointer rounded-full">
+				<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
 					<CircleUserIcon class="size-6" strokeWidth={1.5} />
 				</Button>
 			{/snippet}
@@ -40,9 +42,7 @@
 			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
-
-	<!-- Separator -->
-	<div class="mx-1 h-5 w-px bg-border"></div>
+	{/if}
 
 	<!-- Language Switcher -->
 	<DropdownMenu.Root>

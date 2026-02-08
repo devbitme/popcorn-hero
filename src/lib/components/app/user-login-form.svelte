@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
 	import { toast } from "svelte-sonner";
-	import { Button } from "$lib/components/ui/button";
 	import * as Card from "$lib/components/ui/card";
 	import * as InputOTP from "$lib/components/ui/input-otp";
 	import { m } from "$lib/paraglide/messages.js";
@@ -79,9 +78,6 @@
 					{/if}
 				</div>
 
-				<Button type="submit" class="w-full" disabled={isSubmitting}>
-					{m.user_btn_unlock()}
-				</Button>
 			</form>
 		</Card.Content>
 	</Card.Root>
