@@ -19,5 +19,8 @@
   "user_success_unlocked": "Welcome back!",
   "user_account": "Account",
   "user_settings": "Settings",
-  "user_logout": "Log out"
+  "user_logout": "Log out",
+  "nav_home": "Home",
+  "nav_series": "Series",
+  "nav_movies": "Movies"
 }

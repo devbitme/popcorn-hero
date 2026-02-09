@@ -20,5 +20,8 @@
   "user_success_unlocked": "Willkommen zurück!",
   "user_account": "Konto",
   "user_settings": "Einstellungen",
-  "user_logout": "Abmelden"
+  "user_logout": "Abmelden",
+  "nav_home": "Startseite",
+  "nav_series": "Serien",
+  "nav_movies": "Filme"
 }

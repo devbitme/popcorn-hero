@@ -22,62 +22,76 @@
 	}
 </script>
 
-<div class="fixed top-4 right-8 z-50 flex items-center gap-2">
-	<!-- Avatar / Account Menu -->
+<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-background">
+	<!-- Left: Navigation links -->
 	{#if $currentUser}
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
-					<CircleUserIcon class="size-6" strokeWidth={1.5} />
-				</Button>
-			{/snippet}
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align="end">
-			<DropdownMenu.Item>
-				<a href="/account">{m.user_account()}</a>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item>
-				<a href="/settings">{m.user_settings()}</a>
-			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Item
-				class="cursor-pointer"
-				onclick={() => currentUser.set(null)}
-			>
-				{m.user_logout()}
-			</DropdownMenu.Item>
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
+	<div class="flex items-center gap-6">
+		<a href="/" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_home()}</a>
+		<a href="/series" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_series()}</a>
+		<a href="/movies" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_movies()}</a>
+	</div>
+	{:else}
+	<div></div>
 	{/if}
 
-	<!-- Language Switcher -->
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
-					<svelte:component
-						this={getFlagComponent(getLocale())}
-						class="size-5!"
-					/>
-				</Button>
-			{/snippet}
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align="end" class="min-w-0 bg-primary">
-			{#each locales.filter((l) => l !== getLocale()) as locale}
-				<DropdownMenu.Item
-					class="cursor-pointer justify-center px-2"
-					onclick={() => {
-						info(`[LanguageSwitcher] Changing locale from ${getLocale()} to ${locale}`);
-						setLocale(locale);
-					}}
-				>
-					<svelte:component
-						this={getFlagComponent(locale)}
-						size="18"
-					/>
+	<!-- Right: User + Language -->
+	<div class="flex items-center gap-2">
+		<!-- Avatar / Account Menu -->
+		{#if $currentUser}
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
+						<CircleUserIcon class="size-6" strokeWidth={1.5} />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end">
+				<DropdownMenu.Item>
+					<a href="/account">{m.user_account()}</a>
 				</DropdownMenu.Item>
-			{/each}
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
-</div>
+				<DropdownMenu.Item>
+					<a href="/settings">{m.user_settings()}</a>
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item
+					class="cursor-pointer"
+					onclick={() => currentUser.set(null)}
+				>
+					{m.user_logout()}
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+		{/if}
+
+		<!-- Language Switcher -->
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
+						<svelte:component
+							this={getFlagComponent(getLocale())}
+							class="size-5!"
+						/>
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-0 bg-primary">
+				{#each locales.filter((l) => l !== getLocale()) as locale}
+					<DropdownMenu.Item
+						class="cursor-pointer justify-center px-2"
+						onclick={() => {
+							info(`[LanguageSwitcher] Changing locale from ${getLocale()} to ${locale}`);
+							setLocale(locale);
+						}}
+					>
+						<svelte:component
+							this={getFlagComponent(locale)}
+							size="18"
+						/>
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+	</div>
+</nav>

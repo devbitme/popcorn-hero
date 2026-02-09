@@ -30,17 +30,21 @@
 </script>
 
 <Toaster richColors />
-<LanguageSwitcher />
 
 {#if $isUserLoading}
 	<!-- Loading state -->
 {:else if $currentUser}
-	<main>
-		{@render children()}
-	</main>
+	<div class="h-screen overflow-y-auto">
+		<LanguageSwitcher />
+		<main>
+			{@render children()}
+		</main>
+	</div>
 {:else if existingUser}
+	<LanguageSwitcher />
 	<UserLoginForm userId={existingUser.id} username={existingUser.username} />
 {:else}
+	<LanguageSwitcher />
 	<UserCreateForm />
 {/if}
 

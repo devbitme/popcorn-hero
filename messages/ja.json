@@ -19,5 +19,8 @@
   "user_success_unlocked": "おかえりなさい！",
   "user_account": "アカウント",
   "user_settings": "設定",
-  "user_logout": "ログアウト"
+  "user_logout": "ログアウト",
+  "nav_home": "ホーム",
+  "nav_series": "シリーズ",
+  "nav_movies": "映画"
 }

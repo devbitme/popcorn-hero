@@ -19,5 +19,8 @@
   "user_success_unlocked": "Bentornato!",
   "user_account": "Account",
   "user_settings": "Impostazioni",
-  "user_logout": "Disconnettersi"
+  "user_logout": "Disconnettersi",
+  "nav_home": "Home",
+  "nav_series": "Serie",
+  "nav_movies": "Film"
 }

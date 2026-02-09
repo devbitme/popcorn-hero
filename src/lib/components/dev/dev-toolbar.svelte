@@ -116,7 +116,8 @@
   }
 
   // Common button styles
-  const iconButtonClass = "cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20";
+  const iconButtonClass =
+    "cursor-pointer transition-colors px-2 duration-200 hover:bg-white/20";
 </script>
 
 {#if isEnabled}
@@ -147,10 +148,15 @@
           style:opacity={opacity.current}
         >
           <ButtonGroup.Root>
-            <Button class="cursor-pointer rounded-l-full px-2 group" onclick={togglePinned}>
+            <Button
+              class="cursor-pointer rounded-l-full px-2 group"
+              onclick={togglePinned}
+            >
               <img
                 src="./logo-dev-toolbar.svg"
-                class="size-6 transition-opacity duration-200 {isPinned ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}"
+                class="size-6 transition-opacity duration-200 {isPinned
+                  ? 'opacity-100'
+                  : 'opacity-60 group-hover:opacity-100'}"
                 alt="logo dev toolbar"
               />
             </Button>
@@ -160,7 +166,10 @@
             <Button class={iconButtonClass} onclick={openLogsFolder}>
               <ClipboardClock class="size-6" strokeWidth={1.5} />
             </Button>
-            <Button class="{iconButtonClass} rounded-r-full" onclick={openGitHub}>
+            <Button
+              class="{iconButtonClass} rounded-r-full"
+              onclick={openGitHub}
+            >
               <Github class="size-6" strokeWidth={1.5} />
             </Button>
           </ButtonGroup.Root>
