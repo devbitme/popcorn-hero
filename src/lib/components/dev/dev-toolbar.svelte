@@ -2,7 +2,7 @@
   import ClipboardClock from "@lucide/svelte/icons/clipboard-clock";
   import Github from "@lucide/svelte/icons/github";
   import UserCog from "@lucide/svelte/icons/user-cog";
-  import { appLogDir } from "@tauri-apps/api/path";
+  import { appLocalDataDir, appLogDir, join } from "@tauri-apps/api/path";
   import { info, warn } from "@tauri-apps/plugin-log";
   import { openPath, openUrl } from "@tauri-apps/plugin-opener";
   import { Spring } from "svelte/motion";
@@ -88,6 +88,17 @@
     }
   }
 
+  async function openUserDataFolder() {
+    try {
+      const dataDir = await appLocalDataDir();
+      const usersDir = await join(dataDir, "users");
+      info(`[DevToolbar] Opening user data folder: ${usersDir}`);
+      await openPath(usersDir);
+    } catch (e) {
+      warn(`[DevToolbar] Failed to open user data folder: ${e}`);
+    }
+  }
+
   async function openLogsFolder() {
     try {
       const logDir = await appLogDir();
@@ -143,7 +154,7 @@
                 alt="logo dev toolbar"
               />
             </Button>
-            <Button class={iconButtonClass}>
+            <Button class={iconButtonClass} onclick={openUserDataFolder}>
               <UserCog class="size-6" strokeWidth={1.5} />
             </Button>
             <Button class={iconButtonClass} onclick={openLogsFolder}>
