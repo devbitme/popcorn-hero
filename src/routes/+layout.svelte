@@ -41,11 +41,15 @@
 		</main>
 	</div>
 {:else if existingUser}
-	<LanguageSwitcher />
-	<UserLoginForm userId={existingUser.id} username={existingUser.username} />
+	<div class="h-screen overflow-hidden flex flex-col dark:bg-background">
+		<LanguageSwitcher />
+		<UserLoginForm userId={existingUser.id} username={existingUser.username} />
+	</div>
 {:else}
-	<LanguageSwitcher />
-	<UserCreateForm />
+	<div class="h-screen overflow-hidden flex flex-col">
+		<LanguageSwitcher />
+		<UserCreateForm />
+	</div>
 {/if}
 
 <DevToolbar />

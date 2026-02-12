@@ -137,7 +137,7 @@
     <!-- Dev toolbar bar -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="overflow-hidden pointer-events-auto rounded-full border border-primary bg-primary shadow-lg shadow-primary/50"
+      class="overflow-hidden pointer-events-auto rounded-full border border-primary bg-primary shadow shadow-primary/50"
       style:margin-bottom="{position.current}px"
       onmouseenter={handleMouseEnter}
       onmouseleave={handleMouseLeave}

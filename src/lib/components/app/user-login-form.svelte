@@ -51,10 +51,10 @@
 	}
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-background p-4">
+<div class="flex min-h-screen items-center justify-center p-4">
 	<div class="flex w-full max-w-sm flex-col items-center gap-6">
 		<img src="/logo-circle.svg" alt="Popcorn Hero" class="size-24" />
-		<Card.Root class="w-full border-0 shadow-none rounded-none">
+		<Card.Root class="w-full border-0 shadow-none rounded-none bg-transparent">
 		<Card.Header class="text-center">
 			<Card.Title class="text-2xl">{m.user_login_title({ username })}</Card.Title>
 			<Card.Description>{m.user_login_description()}</Card.Description>

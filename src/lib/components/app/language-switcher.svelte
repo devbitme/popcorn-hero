@@ -1,12 +1,33 @@
 <script lang="ts">
 	import CircleUserIcon from "@lucide/svelte/icons/circle-user";
+	import Moon from "@lucide/svelte/icons/moon";
+	import Sun from "@lucide/svelte/icons/sun";
 	import { info } from "@tauri-apps/plugin-log";
 	import * as Icon from "svelte-flag-icons";
+	import { page } from "$app/stores";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { getLocale, locales, setLocale } from "$lib/paraglide/runtime.js";
 	import { currentUser } from "$lib/stores/user";
+
+	let isDark = $state(typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
+
+	function toggleDarkMode() {
+		isDark = !isDark;
+		document.documentElement.classList.toggle("dark", isDark);
+		localStorage.setItem("theme", isDark ? "dark" : "light");
+		info(`[Theme] Switched to ${isDark ? "dark" : "light"} mode`);
+	}
+
+	// Restore theme on load
+	if (typeof document !== "undefined") {
+		const saved = localStorage.getItem("theme");
+		if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+			document.documentElement.classList.add("dark");
+			isDark = true;
+		}
+	}
 
 	// Exceptions for locale to flag icon mapping
 	const flagExceptions: Record<string, string> = {
@@ -22,13 +43,13 @@
 	}
 </script>
 
-<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-background">
+<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-carbon-100 dark:bg-carbon-800 text-foreground border-b border-carbon-300 dark:border-carbon-600">
 	<!-- Left: Navigation links -->
 	{#if $currentUser}
 	<div class="flex items-center gap-6">
-		<a href="/" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_home()}</a>
-		<a href="/series" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_series()}</a>
-		<a href="/movies" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{m.nav_movies()}</a>
+		<a href="/" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/' ? 'font-bold' : 'font-medium'}">{m.nav_home()}</a>
+		<a href="/series" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/series' ? 'font-bold' : 'font-medium'}">{m.nav_series()}</a>
+		<a href="/movies" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/movies' ? 'font-bold' : 'font-medium'}">{m.nav_movies()}</a>
 	</div>
 	{:else}
 	<div></div>
@@ -41,7 +62,7 @@
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
-					<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
+<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full text-foreground hover:text-foreground/70 hover:bg-foreground/10">
 						<CircleUserIcon class="size-6" strokeWidth={1.5} />
 					</Button>
 				{/snippet}
@@ -64,19 +85,26 @@
 		</DropdownMenu.Root>
 		{/if}
 
+		<!-- Dark Mode Toggle -->
+		<Button variant="ghost" size="icon-lg" class="cursor-pointer rounded-full text-foreground hover:text-foreground/70 hover:bg-foreground/10" onclick={toggleDarkMode}>
+			{#if isDark}
+				<Sun class="size-5" strokeWidth={1.5} />
+			{:else}
+				<Moon class="size-5" strokeWidth={1.5} />
+			{/if}
+		</Button>
+
 		<!-- Language Switcher -->
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
-					<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full">
-						<svelte:component
-							this={getFlagComponent(getLocale())}
-							class="size-5!"
-						/>
+<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full hover:bg-foreground/10">
+						{@const FlagIcon = getFlagComponent(getLocale())}
+						<FlagIcon class="size-5!" />
 					</Button>
 				{/snippet}
 			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end" class="min-w-0 bg-primary">
+			<DropdownMenu.Content align="end" class="min-w-0">
 				{#each locales.filter((l) => l !== getLocale()) as locale}
 					<DropdownMenu.Item
 						class="cursor-pointer justify-center px-2"
@@ -85,10 +113,8 @@
 							setLocale(locale);
 						}}
 					>
-						<svelte:component
-							this={getFlagComponent(locale)}
-							size="18"
-						/>
+						{@const FlagIcon = getFlagComponent(locale)}
+						<FlagIcon size="18" />
 					</DropdownMenu.Item>
 				{/each}
 			</DropdownMenu.Content>
