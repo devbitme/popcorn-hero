@@ -23,6 +23,7 @@
   "nav_home": "Accueil",
   "nav_series": "Séries",
   "nav_movies": "Films",
+  "nav_library": "Perso",
   "settings_media_title": "Dossiers multimédia",
   "settings_media_description": "Configurez les dossiers à scanner pour trouver vos fichiers multimédia (films, séries, etc.).",
   "settings_media_add_folder": "Ajouter un dossier",

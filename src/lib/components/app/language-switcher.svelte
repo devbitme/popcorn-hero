@@ -43,13 +43,14 @@
 	}
 </script>
 
-<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-background text-foreground border-b border-border">
+<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-background/80 backdrop-blur-md text-foreground border-b border-border/50">
 	<!-- Left: Navigation links -->
 	{#if $currentUser}
 	<div class="flex items-center gap-6">
 		<a href="/" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/' ? 'font-bold' : 'font-medium'}">{m.nav_home()}</a>
 		<a href="/series" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/series' ? 'font-bold' : 'font-medium'}">{m.nav_series()}</a>
 		<a href="/movies" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/movies' ? 'font-bold' : 'font-medium'}">{m.nav_movies()}</a>
+		<a href="/library" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/library' ? 'font-bold' : 'font-medium'}">{m.nav_library()}</a>
 	</div>
 	{:else}
 	<div></div>

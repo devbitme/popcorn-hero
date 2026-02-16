@@ -23,6 +23,7 @@
   "nav_home": "ホーム",
   "nav_series": "シリーズ",
   "nav_movies": "映画",
+  "nav_library": "パーソナル",
   "settings_media_title": "メディアフォルダ",
   "settings_media_description": "メディアファイル（映画、シリーズなど）をスキャンするフォルダを設定します。",
   "settings_media_add_folder": "フォルダを追加",

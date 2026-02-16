@@ -53,6 +53,7 @@ pub fn run() {
             media::stop_media_watcher,
             media::fetch_all_metadata,
             media::get_media_metadata,
+            media::get_library_with_metadata,
         ])
         .setup(|_app| {
             log::info!("[App] Popcorn Hero started");

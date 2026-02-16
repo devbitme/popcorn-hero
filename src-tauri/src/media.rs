@@ -437,3 +437,67 @@ pub fn start_media_watcher(app: AppHandle, user_id: String) -> Result<(), String
 pub fn stop_media_watcher(app: AppHandle, user_id: String) -> Result<(), String> {
     crate::watcher::stop_watching(&app, &user_id)
 }
+
+/// A media entry combined with its metadata and resolved image paths
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaWithMetadata {
+    #[serde(flatten)]
+    pub entry: MediaEntry,
+    pub metadata: Option<serde_json::Value>,
+    /// Absolute file path to the poster image (use convertFileSrc on frontend)
+    pub poster_path: Option<String>,
+    /// Absolute file path to the backdrop image (use convertFileSrc on frontend)
+    pub backdrop_path: Option<String>,
+    /// Absolute file path to the episode still image (TV episodes)
+    pub still_path: Option<String>,
+}
+
+/// Get the full media library with metadata and resolved image paths in a single call
+#[tauri::command]
+pub fn get_library_with_metadata(app: AppHandle, user_id: String) -> Result<Vec<MediaWithMetadata>, String> {
+    let entries = get_media_library(app.clone(), user_id.clone())?;
+
+    let results: Vec<MediaWithMetadata> = entries
+        .into_iter()
+        .map(|entry| {
+            let meta = crate::metadata::get_metadata(&app, &user_id, &entry.id).ok();
+            let meta_dir = get_user_dir(&app, &user_id)
+                .map(|d| d.join("metas").join(&entry.id))
+                .ok();
+
+            let mut poster_path: Option<String> = None;
+            let mut backdrop_path: Option<String> = None;
+            let mut still_path: Option<String> = None;
+
+            if let Some(ref dir) = meta_dir {
+                let poster = dir.join("poster.jpg");
+                if poster.exists() {
+                    poster_path = Some(poster.to_string_lossy().to_string());
+                }
+                let backdrop = dir.join("backdrop.jpg");
+                if backdrop.exists() {
+                    backdrop_path = Some(backdrop.to_string_lossy().to_string());
+                }
+                let still = dir.join("still.jpg");
+                if still.exists() {
+                    still_path = Some(still.to_string_lossy().to_string());
+                }
+            }
+
+            MediaWithMetadata {
+                entry,
+                metadata: meta,
+                poster_path,
+                backdrop_path,
+                still_path,
+            }
+        })
+        .collect();
+
+    log::info!(
+        "[Media] Loaded {} entries with metadata for user {}",
+        results.len(),
+        user_id
+    );
+    Ok(results)
+}

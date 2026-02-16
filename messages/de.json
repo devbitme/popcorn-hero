@@ -24,6 +24,7 @@
   "nav_home": "Startseite",
   "nav_series": "Serien",
   "nav_movies": "Filme",
+  "nav_library": "Persönlich",
   "settings_media_title": "Medienordner",
   "settings_media_description": "Konfigurieren Sie die Ordner zum Scannen von Mediendateien (Filme, Serien usw.).",
   "settings_media_add_folder": "Ordner hinzufügen",

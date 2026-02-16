@@ -23,6 +23,7 @@
   "nav_home": "Home",
   "nav_series": "Series",
   "nav_movies": "Movies",
+  "nav_library": "Personal",
   "settings_media_title": "Media Folders",
   "settings_media_description": "Configure the folders to scan for media files (movies, series, etc.).",
   "settings_media_add_folder": "Add folder",

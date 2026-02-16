@@ -23,6 +23,7 @@
   "nav_home": "Home",
   "nav_series": "Serie",
   "nav_movies": "Film",
+  "nav_library": "Personale",
   "settings_media_title": "Cartelle multimediali",
   "settings_media_description": "Configura le cartelle da scansionare per i file multimediali (film, serie, ecc.).",
   "settings_media_add_folder": "Aggiungi cartella",

@@ -67,6 +67,13 @@ pub struct VideoMetadata {
     pub provider: String,
     /// ISO 8601 timestamp of when this metadata was fetched
     pub fetched_at: String,
+    /// Media type: "movie", "tv", or "unknown"
+    #[serde(default = "default_media_type")]
+    pub media_type: String,
+}
+
+fn default_media_type() -> String {
+    "unknown".to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -222,9 +229,16 @@ fn parse_filename(filename: &str) -> ParsedFilename {
     }
 }
 
-/// Clean a raw title string: replace separators with spaces, trim.
+/// Clean a raw title string: replace separators with spaces, remove brackets, trim.
 fn clean_title(raw: &str) -> String {
-    raw.replace('.', " ")
+    // Remove content in square brackets: [720p], [SubFr], etc.
+    let bracket_re = Regex::new(r"\[.*?\]").unwrap();
+    let cleaned = bracket_re.replace_all(raw, "");
+    // Remove content in curly braces: {some-tag}
+    let brace_re = Regex::new(r"\{.*?\}").unwrap();
+    let cleaned = brace_re.replace_all(&cleaned, "");
+    cleaned
+        .replace('.', " ")
         .replace('_', " ")
         .replace('-', " ")
         .split_whitespace()
@@ -278,6 +292,7 @@ fn build_local_metadata(entry: &media::MediaEntry) -> VideoMetadata {
         file_path: Some(entry.path.clone()),
         provider: "local".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: if parsed.is_tv { "tv".to_string() } else { "unknown".to_string() },
     }
 }
 
@@ -512,6 +527,7 @@ fn fetch_from_tmdb(
         file_path: None,
         provider: "tmdb".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: "movie".to_string(),
     };
 
     Ok(Some(TmdbFetchResult {
@@ -823,6 +839,7 @@ fn fetch_tv_from_tmdb(
         file_path: None,
         provider: "tmdb".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: "tv".to_string(),
     };
 
     Ok(Some(TmdbFetchResult {
@@ -1005,6 +1022,7 @@ fn fetch_from_omdb(
         file_path: None,
         provider: "omdb".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: "movie".to_string(), // OMDb only searches movies
     };
 
     Ok(Some(OmdbFetchResult {
@@ -1045,20 +1063,327 @@ fn download_omdb_poster(
 // ─── URL encoding helper ────────────────────────────────────────────────────
 
 fn urlencoded(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            '&' => "%26".to_string(),
-            '=' => "%3D".to_string(),
-            '+' => "%2B".to_string(),
-            '#' => "%23".to_string(),
-            '?' => "%3F".to_string(),
-            _ if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '~' => {
-                c.to_string()
+    // Iterate over UTF-8 bytes (not chars) so that multi-byte characters
+    // like 'é' (0xC3 0xA9) are correctly encoded as "%C3%A9" instead of "%E9".
+    s.as_bytes()
+        .iter()
+        .map(|&b| match b {
+            b' ' => "%20".to_string(),
+            b'&' => "%26".to_string(),
+            b'=' => "%3D".to_string(),
+            b'+' => "%2B".to_string(),
+            b'#' => "%23".to_string(),
+            b'?' => "%3F".to_string(),
+            _ if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' => {
+                (b as char).to_string()
             }
-            _ => format!("%{:02X}", c as u32),
+            _ => format!("%{:02X}", b),
         })
         .collect()
+}
+
+// ─── TMDB Multi-Search (fallback) ───────────────────────────────────────────
+
+#[derive(Deserialize, Debug)]
+struct TmdbMultiSearchResult {
+    results: Vec<TmdbMultiItem>,
+}
+
+#[derive(Deserialize, Debug)]
+struct TmdbMultiItem {
+    id: u64,
+    media_type: String, // "movie", "tv", "person"
+    #[allow(dead_code)]
+    title: Option<String>,        // for movies
+    #[allow(dead_code)]
+    name: Option<String>,         // for tv
+}
+
+/// Use TMDB multi-search as a fallback. This searches movies, TV, and people
+/// simultaneously — useful when we don't know if it's a movie or TV show,
+/// or when the dedicated search returned no results.
+fn fetch_via_multi_search(
+    client: &reqwest::blocking::Client,
+    api_key: &str,
+    title: &str,
+    year: Option<u32>,
+    season: Option<u32>,
+    episode: Option<u32>,
+) -> Result<Option<TmdbFetchResult>, String> {
+    let mut url = format!(
+        "{}/search/multi?api_key={}&query={}",
+        TMDB_BASE_URL,
+        api_key,
+        urlencoded(title)
+    );
+    if let Some(y) = year {
+        url.push_str(&format!("&year={}", y));
+    }
+
+    log::info!("[Metadata/TMDB] Multi-search fallback: \"{}\"", title);
+
+    let resp = client
+        .get(&url)
+        .send()
+        .map_err(|e| format!("TMDB multi-search request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("TMDB multi-search returned status {}", resp.status()));
+    }
+
+    let search: TmdbMultiSearchResult = resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB multi-search response: {}", e))?;
+
+    // Find the first movie or TV result
+    for item in &search.results {
+        match item.media_type.as_str() {
+            "movie" => {
+                log::info!("[Metadata/TMDB] Multi-search found movie id={}", item.id);
+                // Re-use the movie detail fetch
+                return fetch_movie_by_id(client, api_key, item.id);
+            }
+            "tv" => {
+                log::info!("[Metadata/TMDB] Multi-search found TV show id={}", item.id);
+                // Re-use the TV detail fetch
+                return fetch_tv_by_id(client, api_key, item.id, season, episode);
+            }
+            _ => continue,
+        }
+    }
+
+    log::info!("[Metadata/TMDB] Multi-search found nothing for \"{}\"", title);
+    Ok(None)
+}
+
+/// Fetch a movie by TMDB ID directly (used by multi-search fallback)
+fn fetch_movie_by_id(
+    client: &reqwest::blocking::Client,
+    api_key: &str,
+    movie_id: u64,
+) -> Result<Option<TmdbFetchResult>, String> {
+    let detail_url = format!(
+        "{}/movie/{}?api_key={}&append_to_response=credits",
+        TMDB_BASE_URL, movie_id, api_key
+    );
+
+    let detail_resp = client
+        .get(&detail_url)
+        .send()
+        .map_err(|e| format!("TMDB movie detail request failed: {}", e))?;
+
+    if !detail_resp.status().is_success() {
+        return Err(format!("TMDB movie detail returned status {}", detail_resp.status()));
+    }
+
+    let detail: TmdbMovieDetail = detail_resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB movie detail response: {}", e))?;
+
+    let year = detail
+        .release_date
+        .as_deref()
+        .and_then(|d| d.split('-').next())
+        .and_then(|y| y.parse::<u32>().ok());
+
+    let cast = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.cast.as_ref())
+        .map(|c| {
+            c.iter()
+                .take(10)
+                .map(|a| CastMember {
+                    name: a.name.clone(),
+                    character: a.character.clone(),
+                    profile_path: a.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let crew = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.crew.as_ref())
+        .map(|c| {
+            c.iter()
+                .filter(|m| matches!(m.job.as_deref(), Some("Director") | Some("Writer") | Some("Screenplay")))
+                .map(|m| CrewMember {
+                    name: m.name.clone(),
+                    job: m.job.clone(),
+                    profile_path: m.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let metadata = VideoMetadata {
+        title: detail.title.unwrap_or_default(),
+        original_title: detail.original_title,
+        year,
+        overview: detail.overview,
+        tagline: detail.tagline,
+        genres: detail.genres.unwrap_or_default().into_iter().map(|g| g.name).collect(),
+        runtime_minutes: detail.runtime,
+        rating: detail.vote_average,
+        vote_count: detail.vote_count,
+        release_date: detail.release_date,
+        imdb_id: detail.imdb_id,
+        tmdb_id: Some(detail.id),
+        cast,
+        crew,
+        studios: detail.production_companies.unwrap_or_default().into_iter().map(|c| c.name).collect(),
+        language: detail.original_language,
+        status: detail.status,
+        season_number: None,
+        episode_number: None,
+        episode_title: None,
+        episode_overview: None,
+        episode_still: None,
+        images: MetadataImages::default(),
+        file_size_bytes: None,
+        container: None,
+        file_path: None,
+        provider: "tmdb".to_string(),
+        fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: "movie".to_string(),
+    };
+
+    Ok(Some(TmdbFetchResult {
+        metadata,
+        poster_path: detail.poster_path,
+        backdrop_path: detail.backdrop_path,
+    }))
+}
+
+/// Fetch a TV show by TMDB ID directly (used by multi-search fallback)
+fn fetch_tv_by_id(
+    client: &reqwest::blocking::Client,
+    api_key: &str,
+    tv_id: u64,
+    season: Option<u32>,
+    episode: Option<u32>,
+) -> Result<Option<TmdbFetchResult>, String> {
+    let detail_url = format!(
+        "{}/tv/{}?api_key={}&append_to_response=credits",
+        TMDB_BASE_URL, tv_id, api_key
+    );
+
+    let detail_resp = client
+        .get(&detail_url)
+        .send()
+        .map_err(|e| format!("TMDB TV detail request failed: {}", e))?;
+
+    if !detail_resp.status().is_success() {
+        return Err(format!("TMDB TV detail returned status {}", detail_resp.status()));
+    }
+
+    let detail: TmdbTvDetail = detail_resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB TV detail response: {}", e))?;
+
+    let year = detail
+        .first_air_date
+        .as_deref()
+        .and_then(|d| d.split('-').next())
+        .and_then(|y| y.parse::<u32>().ok());
+
+    let cast = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.cast.as_ref())
+        .map(|c| {
+            c.iter()
+                .take(10)
+                .map(|a| CastMember {
+                    name: a.name.clone(),
+                    character: a.character.clone(),
+                    profile_path: a.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let crew = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.crew.as_ref())
+        .map(|c| {
+            c.iter()
+                .filter(|m| matches!(m.job.as_deref(), Some("Director") | Some("Writer") | Some("Screenplay") | Some("Executive Producer")))
+                .take(10)
+                .map(|m| CrewMember {
+                    name: m.name.clone(),
+                    job: m.job.clone(),
+                    profile_path: m.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let runtime = detail
+        .episode_run_time
+        .as_ref()
+        .and_then(|r| r.first().copied());
+
+    let mut episode_title = None;
+    let mut episode_overview = None;
+    let mut episode_still = None;
+    let mut ep_season = None;
+    let mut ep_episode = None;
+
+    if let (Some(s), Some(e)) = (season, episode) {
+        match fetch_episode_from_tmdb(client, api_key, tv_id, s, e) {
+            Ok(Some(ep)) => {
+                episode_title = ep.name;
+                episode_overview = ep.overview;
+                episode_still = ep.still_path;
+                ep_season = Some(s);
+                ep_episode = Some(e);
+            }
+            Ok(None) => {}
+            Err(err) => log::warn!("[Metadata/TMDB] Episode fetch error: {}", err),
+        }
+    }
+
+    let metadata = VideoMetadata {
+        title: detail.name.unwrap_or_default(),
+        original_title: detail.original_name,
+        year,
+        overview: detail.overview,
+        tagline: detail.tagline,
+        genres: detail.genres.unwrap_or_default().into_iter().map(|g| g.name).collect(),
+        runtime_minutes: runtime,
+        rating: detail.vote_average,
+        vote_count: detail.vote_count,
+        release_date: detail.first_air_date,
+        imdb_id: None,
+        tmdb_id: Some(detail.id),
+        cast,
+        crew,
+        studios: detail.production_companies.unwrap_or_default().into_iter().map(|c| c.name).collect(),
+        language: detail.original_language,
+        status: detail.status,
+        season_number: ep_season,
+        episode_number: ep_episode,
+        episode_title,
+        episode_overview,
+        episode_still,
+        images: MetadataImages::default(),
+        file_size_bytes: None,
+        container: None,
+        file_path: None,
+        provider: "tmdb".to_string(),
+        fetched_at: chrono::Local::now().to_rfc3339(),
+        media_type: "tv".to_string(),
+    };
+
+    Ok(Some(TmdbFetchResult {
+        metadata,
+        poster_path: detail.poster_path,
+        backdrop_path: detail.backdrop_path,
+    }))
 }
 
 // ─── Metas folder management ────────────────────────────────────────────────
@@ -1193,6 +1518,23 @@ fn save_metadata_and_images(
         _ => {}
     }
 
+    // Download episode still image (TV episodes)
+    if provider_id == "tmdb" {
+        if let Some(ref still) = metadata.episode_still {
+            // episode_still is a TMDB path like "/abc123.jpg"
+            if still.starts_with('/') {
+                let still_save_path = meta_dir.join("still.jpg");
+                match download_tmdb_image(client, still, "w500", &still_save_path) {
+                    Ok(()) => {
+                        metadata.episode_still = Some("still.jpg".to_string());
+                        log::info!("[Metadata] Episode still saved for {}", media_id);
+                    }
+                    Err(e) => log::warn!("[Metadata] Failed to download episode still: {}", e),
+                }
+            }
+        }
+    }
+
     // Save meta.json
     let meta_json =
         serde_json::to_string_pretty(metadata).map_err(|e| format!("Failed to serialize: {}", e))?;
@@ -1212,6 +1554,11 @@ fn save_metadata_and_images(
 /// Fetch metadata for a single media entry, trying providers in order.
 /// If no provider succeeds (or none are configured), falls back to local
 /// metadata extracted from the filename and file info.
+///
+/// Search strategy for TMDB:
+/// 1. Dedicated search (movie or TV based on filename pattern)
+/// 2. Multi-search fallback with parsed title
+/// 3. Multi-search with progressively simplified title (remove trailing words)
 fn fetch_metadata_for_entry(
     client: &reqwest::blocking::Client,
     app: &AppHandle,
@@ -1245,45 +1592,97 @@ fn fetch_metadata_for_entry(
                     provider.api_key.clone()
                 };
 
-                // Use TV search for series, movie search for movies
+                // Strategy 1: Dedicated search (movie or TV based on filename pattern)
                 let tmdb_result = if parsed.is_tv {
                     fetch_tv_from_tmdb(client, &api_key, &parsed.title, parsed.season, parsed.episode)
                 } else {
                     fetch_from_tmdb(client, &api_key, &parsed.title, parsed.year)
                 };
 
-                match tmdb_result {
-                    Ok(Some(result)) => {
+                if let Ok(Some(result)) = tmdb_result {
+                    let mut metadata = result.metadata;
+                    metadata.file_size_bytes = Some(entry.size_bytes);
+                    metadata.container = Some(entry.extension.clone());
+                    metadata.file_path = Some(entry.path.clone());
+                    save_metadata_and_images(
+                        client, app, user_id, &entry.id, &mut metadata,
+                        "tmdb", result.poster_path.as_deref(), result.backdrop_path.as_deref(), None,
+                    )?;
+                    return Ok(true);
+                }
+
+                // Strategy 2: Multi-search with full parsed title
+                log::info!(
+                    "[Metadata] Dedicated search failed for \"{}\", trying multi-search",
+                    parsed.title
+                );
+                if let Ok(Some(result)) = fetch_via_multi_search(
+                    client, &api_key, &parsed.title, parsed.year, parsed.season, parsed.episode,
+                ) {
+                    let mut metadata = result.metadata;
+                    metadata.file_size_bytes = Some(entry.size_bytes);
+                    metadata.container = Some(entry.extension.clone());
+                    metadata.file_path = Some(entry.path.clone());
+                    save_metadata_and_images(
+                        client, app, user_id, &entry.id, &mut metadata,
+                        "tmdb", result.poster_path.as_deref(), result.backdrop_path.as_deref(), None,
+                    )?;
+                    return Ok(true);
+                }
+
+                // Strategy 3: Try progressively shorter titles
+                // e.g. "Some Movie Name Extended" → "Some Movie Name" → "Some Movie"
+                let words: Vec<&str> = parsed.title.split_whitespace().collect();
+                if words.len() > 2 {
+                    for drop_count in 1..=(words.len().saturating_sub(2).min(3)) {
+                        let shorter_title = words[..words.len() - drop_count].join(" ");
+                        log::info!(
+                            "[Metadata] Trying shorter title: \"{}\"",
+                            shorter_title
+                        );
+                        if let Ok(Some(result)) = fetch_via_multi_search(
+                            client, &api_key, &shorter_title, parsed.year, parsed.season, parsed.episode,
+                        ) {
+                            let mut metadata = result.metadata;
+                            metadata.file_size_bytes = Some(entry.size_bytes);
+                            metadata.container = Some(entry.extension.clone());
+                            metadata.file_path = Some(entry.path.clone());
+                            save_metadata_and_images(
+                                client, app, user_id, &entry.id, &mut metadata,
+                                "tmdb", result.poster_path.as_deref(), result.backdrop_path.as_deref(), None,
+                            )?;
+                            return Ok(true);
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    }
+                }
+
+                // Strategy 4: Try without year constraint (year might be wrong)
+                if parsed.year.is_some() {
+                    log::info!(
+                        "[Metadata] Trying without year for \"{}\"",
+                        parsed.title
+                    );
+                    if let Ok(Some(result)) = fetch_via_multi_search(
+                        client, &api_key, &parsed.title, None, parsed.season, parsed.episode,
+                    ) {
                         let mut metadata = result.metadata;
-                        // Enrich with file-level info
                         metadata.file_size_bytes = Some(entry.size_bytes);
                         metadata.container = Some(entry.extension.clone());
                         metadata.file_path = Some(entry.path.clone());
                         save_metadata_and_images(
-                            client,
-                            app,
-                            user_id,
-                            &entry.id,
-                            &mut metadata,
-                            "tmdb",
-                            result.poster_path.as_deref(),
-                            result.backdrop_path.as_deref(),
-                            None,
+                            client, app, user_id, &entry.id, &mut metadata,
+                            "tmdb", result.poster_path.as_deref(), result.backdrop_path.as_deref(), None,
                         )?;
                         return Ok(true);
                     }
-                    Ok(None) => {
-                        log::info!(
-                            "[Metadata] TMDB found nothing for \"{}\", trying next provider",
-                            parsed.title
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        log::warn!("[Metadata] TMDB error: {}", e);
-                        continue;
-                    }
                 }
+
+                log::info!(
+                    "[Metadata] All TMDB strategies failed for \"{}\", trying next provider",
+                    parsed.title
+                );
+                continue;
             }
             "omdb" => {
                 // OMDb has no built-in key — skip if user didn't provide one
@@ -1293,20 +1692,12 @@ fn fetch_metadata_for_entry(
                 match fetch_from_omdb(client, &provider.api_key, &parsed.title, parsed.year) {
                     Ok(Some(result)) => {
                         let mut metadata = result.metadata;
-                        // Enrich with file-level info
                         metadata.file_size_bytes = Some(entry.size_bytes);
                         metadata.container = Some(entry.extension.clone());
                         metadata.file_path = Some(entry.path.clone());
                         save_metadata_and_images(
-                            client,
-                            app,
-                            user_id,
-                            &entry.id,
-                            &mut metadata,
-                            "omdb",
-                            None,
-                            None,
-                            result.poster_url.as_deref(),
+                            client, app, user_id, &entry.id, &mut metadata,
+                            "omdb", None, None, result.poster_url.as_deref(),
                         )?;
                         return Ok(true);
                     }

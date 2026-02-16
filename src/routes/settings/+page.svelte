@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleHelp, Download, ExternalLink, FolderOpen, GripVertical, Plus, RefreshCw, Trash2 } from "@lucide/svelte";
+	import { ArrowDown, ArrowUp, CircleHelp, Download, ExternalLink, FolderOpen, Plus, RefreshCw, Trash2 } from "@lucide/svelte";
 	import { invoke } from "@tauri-apps/api/core";
 	import { info, warn } from "@tauri-apps/plugin-log";
 	import { onMount } from "svelte";
@@ -97,7 +97,7 @@
 	let isScanning = $state(false);
 	let isFetchingMetadata = $state(false);
 	let confirmRemoveFolder = $state<string | null>(null);
-	let dragIndex = $state<number | null>(null);
+
 
 	onMount(async () => {
 		await loadConfig();
@@ -245,22 +245,12 @@
 		await saveSettingsToggle();
 	}
 
-	function handleDragStart(index: number) {
-		dragIndex = index;
-	}
-
-	function handleDragOver(e: DragEvent, index: number) {
-		e.preventDefault();
-		if (dragIndex === null || dragIndex === index) return;
+	function moveProvider(index: number, direction: "up" | "down") {
+		const newIndex = direction === "up" ? index - 1 : index + 1;
+		if (newIndex < 0 || newIndex >= metadataProviders.length) return;
 		const items = [...metadataProviders];
-		const [moved] = items.splice(dragIndex, 1);
-		items.splice(index, 0, moved);
+		[items[index], items[newIndex]] = [items[newIndex], items[index]];
 		metadataProviders = items;
-		dragIndex = index;
-	}
-
-	function handleDragEnd() {
-		dragIndex = null;
 		saveSettingsToggle();
 	}
 
@@ -425,21 +415,29 @@
 						<div class="space-y-3">
 							{#each metadataProviders as provider, index (provider.id)}
 								<div
-									class="rounded-md border p-4 transition-colors {dragIndex === index ? 'border-primary bg-muted/50' : ''}"
-									draggable="true"
-									ondragstart={() => handleDragStart(index)}
-									ondragover={(e) => handleDragOver(e, index)}
-									ondragend={handleDragEnd}
-									role="listitem"
-								>
-									<div class="flex items-center justify-between gap-4">
-										<div class="flex items-center gap-3">
+								class="rounded-md border p-4 transition-colors"
+								role="listitem"
+							>
+								<div class="flex items-center justify-between gap-4">
+									<div class="flex items-center gap-3">
+										<div class="flex flex-col">
 											<button
-												class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-												aria-label="Drag to reorder"
+												class="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-0.5 -my-0.5"
+												aria-label="Move up"
+												disabled={index === 0}
+												onclick={() => moveProvider(index, "up")}
 											>
-												<GripVertical class="size-4" />
+												<ArrowUp class="size-3.5" />
 											</button>
+											<button
+												class="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-0.5 -my-0.5"
+												aria-label="Move down"
+												disabled={index === metadataProviders.length - 1}
+												onclick={() => moveProvider(index, "down")}
+											>
+												<ArrowDown class="size-3.5" />
+											</button>
+										</div>
 											<div class="space-y-0.5">
 												<div class="flex items-center gap-2">
 											{#if PROVIDER_LOGOS[provider.id]}
