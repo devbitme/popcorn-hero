@@ -43,7 +43,7 @@
 	}
 </script>
 
-<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-carbon-100 dark:bg-carbon-800 text-foreground border-b border-carbon-300 dark:border-carbon-600">
+<nav class="sticky top-0 w-full flex items-center justify-between px-8 py-3 z-50 bg-background text-foreground border-b border-border">
 	<!-- Left: Navigation links -->
 	{#if $currentUser}
 	<div class="flex items-center gap-6">

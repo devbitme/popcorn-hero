@@ -11,6 +11,7 @@
 	import { Label } from "$lib/components/ui/label";
 	import * as Popover from "$lib/components/ui/popover";
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
+	import * as Select from "$lib/components/ui/select";
 	import { Separator } from "$lib/components/ui/separator";
 	import { Switch } from "$lib/components/ui/switch";
 	import { m } from "$lib/paraglide/messages.js";
@@ -32,6 +33,7 @@
 		scan_on_startup: boolean;
 		live_scan: boolean;
 		metadata_providers: MetadataProviderConfig[];
+		metadata_cache_months: number;
 	}
 
 	interface ScanResult {
@@ -44,8 +46,28 @@
 		omdb: "https://www.omdbapi.com/apikey.aspx"
 	};
 
-	const PROVIDER_HELP: Record<string, () => { steps: string[]; link: string; linkLabel: string }> = {
+	const PROVIDER_LOGOS: Record<string, { src: string; alt: string; href: string; attribution: () => string }> = {
+		tmdb: {
+			src: "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg",
+			alt: "TMDB",
+			href: "https://www.themoviedb.org",
+			attribution: () => m.settings_metadata_tmdb_attribution()
+		}
+	};
+
+	/** Provider-specific help popover config */
+	type ProviderHelpConfig = {
+		builtin?: string;
+		customTitle?: string;
+		steps: string[];
+		link: string;
+		linkLabel: string;
+	};
+
+	const PROVIDER_HELP: Record<string, () => ProviderHelpConfig> = {
 		tmdb: () => ({
+			builtin: m.settings_metadata_help_tmdb_builtin(),
+			customTitle: m.settings_metadata_help_tmdb_custom_title(),
 			steps: [
 				m.settings_metadata_help_tmdb_step1(),
 				m.settings_metadata_help_tmdb_step2(),
@@ -70,6 +92,7 @@
 	let scanOnStartup = $state(true);
 	let liveScan = $state(true);
 	let metadataProviders = $state<MetadataProviderConfig[]>([]);
+	let metadataCacheMonths = $state(1);
 	let isLoading = $state(true);
 	let isScanning = $state(false);
 	let isFetchingMetadata = $state(false);
@@ -89,6 +112,7 @@
 			scanOnStartup = settings.scan_on_startup;
 			liveScan = settings.live_scan;
 			metadataProviders = settings.metadata_providers ?? [];
+			metadataCacheMonths = settings.metadata_cache_months ?? 1;
 			info("[Settings] Loaded settings: " + folders.length + " folder(s), scanOnStartup=" + scanOnStartup + ", liveScan=" + liveScan + ", providers=" + metadataProviders.length);
 		} catch (error) {
 			warn("[Settings] Failed to load settings: " + String(error));
@@ -130,7 +154,8 @@
 				media: { folders },
 				scan_on_startup: scanOnStartup,
 				live_scan: liveScan,
-				metadata_providers: metadataProviders
+				metadata_providers: metadataProviders,
+				metadata_cache_months: metadataCacheMonths
 			};
 			await invoke("update_settings", { userId, settings });
 			info("[Settings] Settings saved: scanOnStartup=" + scanOnStartup + ", liveScan=" + liveScan);
@@ -252,6 +277,15 @@
 			warn("[Settings] Metadata fetch failed: " + String(error));
 		} finally {
 			isFetchingMetadata = false;
+		}
+	}
+
+	async function handleCacheMonthsChange(value: string) {
+		const months = Number.parseInt(value, 10);
+		if (months >= 1 && months <= 6) {
+			metadataCacheMonths = months;
+			await saveSettingsToggle();
+			info("[Settings] Cache duration updated to " + months + " month(s)");
 		}
 	}
 </script>
@@ -408,7 +442,20 @@
 											</button>
 											<div class="space-y-0.5">
 												<div class="flex items-center gap-2">
-													<span class="text-sm font-medium">{provider.name}</span>
+											{#if PROVIDER_LOGOS[provider.id]}
+												{@const logo = PROVIDER_LOGOS[provider.id]}
+												<a
+													href={logo.href}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity"
+												>
+													<img src={logo.src} alt={logo.alt} class="h-3" />
+													<span class="text-[10px] text-muted-foreground">{logo.attribution()}</span>
+												</a>
+											{:else}
+												<span class="text-sm font-medium">{provider.name}</span>
+											{/if}
 													{#if PROVIDER_HELP[provider.id]}
 														{@const help = PROVIDER_HELP[provider.id]()}
 														<Popover.Root>
@@ -447,11 +494,18 @@
 									</div>
 									{#if provider.enabled}
 										<div class="mt-3 ml-7">
-											<Label class="text-xs text-muted-foreground">{m.settings_metadata_api_key()}</Label>
+											<Label class="text-xs text-muted-foreground">
+												{m.settings_metadata_api_key()}
+												{#if provider.id === "tmdb"}
+													<span class="text-muted-foreground/60">({m.settings_metadata_api_key_optional()})</span>
+												{:else}
+													<span class="text-muted-foreground/60">({m.settings_metadata_api_key_required()})</span>
+												{/if}
+											</Label>
 											<Input
 												type="password"
 												class="mt-1"
-												placeholder={m.settings_metadata_api_key_placeholder()}
+												placeholder={provider.id === "tmdb" ? m.settings_metadata_api_key_builtin() : m.settings_metadata_api_key_placeholder()}
 												value={provider.api_key}
 												oninput={(e) => handleApiKeyChange(index, e.currentTarget.value)}
 												onblur={handleApiKeyBlur}
@@ -469,11 +523,42 @@
 						<Button
 							variant="default"
 							onclick={handleFetchMetadata}
-							disabled={isFetchingMetadata || !metadataProviders.some((p) => p.enabled && p.api_key)}
+							disabled={isFetchingMetadata || !metadataProviders.some((p) => p.enabled)}
 						>
 							<Download class="size-4 {isFetchingMetadata ? 'animate-bounce' : ''}" />
 							{isFetchingMetadata ? m.settings_metadata_fetching() : m.settings_metadata_fetch()}
 						</Button>
+					</div>
+
+					<Separator />
+
+					<div class="flex items-center justify-between gap-4">
+						<div class="space-y-0.5">
+							<Label for="cache-duration">{m.settings_metadata_cache_title()}</Label>
+							<p class="text-sm text-muted-foreground">
+								{m.settings_metadata_cache_description()}
+							</p>
+						</div>
+						<Select.Root
+							type="single"
+							value={String(metadataCacheMonths)}
+							onValueChange={handleCacheMonthsChange}
+						>
+							<Select.Trigger class="w-35" id="cache-duration">
+								{metadataCacheMonths === 1
+									? m.settings_metadata_cache_month({ count: "1" })
+									: m.settings_metadata_cache_months({ count: String(metadataCacheMonths) })}
+							</Select.Trigger>
+							<Select.Content>
+								{#each [1, 2, 3, 4, 5, 6] as months}
+									<Select.Item value={String(months)}>
+										{months === 1
+											? m.settings_metadata_cache_month({ count: "1" })
+											: m.settings_metadata_cache_months({ count: String(months) })}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
 					</div>
 				</div>
 			{/if}

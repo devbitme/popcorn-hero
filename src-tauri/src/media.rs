@@ -81,7 +81,7 @@ fn default_metadata_providers() -> Vec<MetadataProviderConfig> {
         MetadataProviderConfig {
             id: "tmdb".to_string(),
             name: "The Movie Database (TMDB)".to_string(),
-            enabled: false,
+            enabled: true,
             api_key: String::new(),
         },
         MetadataProviderConfig {
@@ -104,10 +104,17 @@ pub struct Settings {
     pub live_scan: bool,
     #[serde(default = "default_metadata_providers")]
     pub metadata_providers: Vec<MetadataProviderConfig>,
+    /// How many months metadata should be cached before being refreshed (1-6)
+    #[serde(default = "default_cache_months")]
+    pub metadata_cache_months: u32,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_cache_months() -> u32 {
+    1
 }
 
 impl Default for Settings {
@@ -117,6 +124,7 @@ impl Default for Settings {
             scan_on_startup: true,
             live_scan: true,
             metadata_providers: default_metadata_providers(),
+            metadata_cache_months: 1,
         }
     }
 }

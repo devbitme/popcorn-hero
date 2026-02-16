@@ -61,5 +61,16 @@
   "settings_metadata_help_tmdb_step4": "Copiez la clé API (v3 auth) et collez-la ici.",
   "settings_metadata_help_omdb_step1": "Allez sur omdbapi.com et cliquez sur 'API Key'.",
   "settings_metadata_help_omdb_step2": "Choisissez le plan gratuit (1 000 requêtes/jour).",
-  "settings_metadata_help_omdb_step3": "Entrez votre email, recevez votre clé et collez-la ici."
+  "settings_metadata_help_omdb_step3": "Entrez votre email, recevez votre clé et collez-la ici.",
+  "settings_metadata_help_tmdb_builtin": "Une clé API intégrée est incluse. TMDB fonctionne directement — aucune configuration nécessaire. Si vous préférez utiliser votre propre clé (ex : usage intensif), suivez les étapes ci-dessous.",
+  "settings_metadata_help_tmdb_custom_title": "Utiliser votre propre clé (optionnel) :",
+  "settings_metadata_api_key_optional": "optionnel",
+  "settings_metadata_api_key_required": "obligatoire",
+  "settings_metadata_api_key_builtin": "Clé intégrée active",
+  "settings_metadata_tmdb_attribution": "Métadonnées fournies par TMDB",
+  "settings_metadata_omdb_attribution": "Métadonnées fournies par OMDb",
+  "settings_metadata_cache_title": "Durée du cache",
+  "settings_metadata_cache_description": "Les métadonnées seront automatiquement actualisées après cette période.",
+  "settings_metadata_cache_month": "{count} mois",
+  "settings_metadata_cache_months": "{count} mois"
 }

@@ -61,5 +61,16 @@
   "settings_metadata_help_tmdb_step4": "API Key (v3 auth) をコピーしてここに貼り付けます。",
   "settings_metadata_help_omdb_step1": "omdbapi.comにアクセスし、'API Key'をクリックします。",
   "settings_metadata_help_omdb_step2": "無料プラン（1日1,000リクエスト）を選択します。",
-  "settings_metadata_help_omdb_step3": "メールアドレスを入力し、キーを受け取ってここに貼り付けます。"
+  "settings_metadata_help_omdb_step3": "メールアドレスを入力し、キーを受け取ってここに貼り付けます。",
+  "settings_metadata_help_tmdb_builtin": "内蔵APIキーが含まれています。TMDBは設定不要ですぐに使えます。独自のキーを使用したい場合（大量使用時など）、以下の手順に従ってください。",
+  "settings_metadata_help_tmdb_custom_title": "独自のキーを使用（任意）：",
+  "settings_metadata_api_key_optional": "任意",
+  "settings_metadata_api_key_required": "必須",
+  "settings_metadata_api_key_builtin": "内蔵キー使用中",
+  "settings_metadata_tmdb_attribution": "メタデータ提供：TMDB",
+  "settings_metadata_omdb_attribution": "メタデータ提供：OMDb",
+  "settings_metadata_cache_title": "キャッシュ期間",
+  "settings_metadata_cache_description": "この期間を過ぎるとメタデータは自動的に更新されます。",
+  "settings_metadata_cache_month": "{count}ヶ月",
+  "settings_metadata_cache_months": "{count}ヶ月"
 }

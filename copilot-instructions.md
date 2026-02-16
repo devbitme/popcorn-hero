@@ -220,6 +220,87 @@ SvelteKit is a framework for rapidly developing robust, performant web applicati
 - [registry-item.json](https://shadcn-svelte.com/docs/registry/registry-item-json.md): Specification for registry items.
 - [registry.json](https://shadcn-svelte.com/docs/registry/registry-json.md): Schema for running your own component registry.
 
+## TMDB API Documentation Reference
+
+**Full Documentation**: https://developer.themoviedb.org/docs/getting-started
+**API Reference**: https://developer.themoviedb.org/reference
+
+### Authentication
+
+Two methods are available (both provide the same access level):
+
+1. **API Key (v3)** — query parameter:
+   ```
+   GET https://api.themoviedb.org/3/movie/11?api_key=YOUR_KEY
+   ```
+2. **Bearer Token (v3+v4)** — header (preferred by TMDB docs):
+   ```
+   GET https://api.themoviedb.org/3/movie/11
+   Authorization: Bearer <<access_token>>
+   ```
+
+The project currently uses method 1 (`api_key` query param). Both are fully supported.
+
+### Endpoints Used in This Project
+
+#### Search Movie
+- **GET** `https://api.themoviedb.org/3/search/movie`
+- Query params: `api_key`, `query` (required), `year`, `include_adult` (default false), `language` (default en-US), `page` (default 1), `primary_release_year`, `region`
+- Returns: `{ page, results: [{ id, title, original_title, overview, release_date, vote_average, vote_count, genre_ids, poster_path, backdrop_path, original_language, ... }], total_pages, total_results }`
+- Ref: https://developer.themoviedb.org/reference/search-movie
+
+#### Movie Details
+- **GET** `https://api.themoviedb.org/3/movie/{movie_id}`
+- Query params: `api_key`, `append_to_response` (comma-separated, max 20 items), `language` (default en-US)
+- `append_to_response=credits` appends cast and crew data in the same request
+- Returns: `{ id, title, original_title, overview, tagline, release_date, runtime, vote_average, vote_count, genres, poster_path, backdrop_path, imdb_id, original_language, status, production_companies, credits: { cast, crew } }`
+- Ref: https://developer.themoviedb.org/reference/movie-details
+
+#### TV Series Search
+- **GET** `https://api.themoviedb.org/3/search/tv`
+- Query params: `api_key`, `query` (required), `first_air_date_year`, `language`, `page`
+- Returns: `{ results: [{ id, name, original_name, overview, first_air_date, poster_path, backdrop_path, ... }] }`
+- Ref: https://developer.themoviedb.org/reference/search-tv
+
+#### TV Series Details
+- **GET** `https://api.themoviedb.org/3/tv/{series_id}`
+- Query params: `api_key`, `append_to_response` (e.g. `credits`), `language`
+- Returns: `{ id, name, original_name, overview, tagline, first_air_date, genres, poster_path, backdrop_path, credits, ... }`
+- Ref: https://developer.themoviedb.org/reference/tv-series-details
+
+#### TV Episode Details
+- **GET** `https://api.themoviedb.org/3/tv/{series_id}/season/{season_number}/episode/{episode_number}`
+- Query params: `api_key`, `language`
+- Returns: `{ name, overview, still_path, air_date, episode_number, season_number, vote_average, ... }`
+- Used to get the episode title, pitch/overview, and still image for individual episodes
+- Ref: https://developer.themoviedb.org/reference/tv-episode-details
+
+#### Append To Response
+- Available on movie, TV show, TV season, TV episode and person detail methods
+- Comma-separated list of sub-endpoints (e.g. `credits,videos,images`), max 20 items
+- Each sub-request responds to its own query parameters (e.g. `include_image_language` for images)
+- Ref: https://developer.themoviedb.org/docs/append-to-response
+
+### Image URLs
+
+To build a full image URL, combine 3 pieces:
+```
+https://image.tmdb.org/t/p/{size}/{file_path}
+```
+- **Base URL**: `https://image.tmdb.org/t/p`
+- **Poster sizes**: `w92`, `w154`, `w185`, `w342`, `w500`, `w780`, `original`
+- **Backdrop sizes**: `w300`, `w780`, `w1280`, `original`
+- **Profile sizes**: `w45`, `w185`, `h632`, `original`
+- Example: `https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg`
+- Ref: https://developer.themoviedb.org/docs/image-basics
+
+### Configuration & Limits
+
+- **Rate Limiting**: documented at https://developer.themoviedb.org/docs/rate-limiting
+- **Errors**: documented at https://developer.themoviedb.org/docs/errors
+- **API Key registration**: https://www.themoviedb.org/settings/api
+- The API key is injected at compile time via `TMDB_API_KEY` env var (see `.env` / GitHub Secrets)
+
 ## Development Guidelines
 
 When working on this project, keep in mind:

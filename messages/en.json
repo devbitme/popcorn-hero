@@ -61,5 +61,16 @@
   "settings_metadata_help_tmdb_step4": "Copy the API Key (v3 auth) and paste it here.",
   "settings_metadata_help_omdb_step1": "Go to omdbapi.com and click 'API Key'.",
   "settings_metadata_help_omdb_step2": "Choose the free plan (1,000 requests/day).",
-  "settings_metadata_help_omdb_step3": "Enter your email, receive your key, and paste it here."
+  "settings_metadata_help_omdb_step3": "Enter your email, receive your key, and paste it here.",
+  "settings_metadata_help_tmdb_builtin": "A built-in API key is included. TMDB works out of the box — no setup needed. If you prefer using your own key (e.g. for heavy usage), follow the steps below.",
+  "settings_metadata_help_tmdb_custom_title": "Use your own key (optional):",
+  "settings_metadata_api_key_optional": "optional",
+  "settings_metadata_api_key_required": "required",
+  "settings_metadata_api_key_builtin": "Built-in key active",
+  "settings_metadata_tmdb_attribution": "Metadata provided by TMDB",
+  "settings_metadata_omdb_attribution": "Metadata provided by OMDb",
+  "settings_metadata_cache_title": "Cache Duration",
+  "settings_metadata_cache_description": "Metadata will be refreshed automatically after this period.",
+  "settings_metadata_cache_month": "{count} month",
+  "settings_metadata_cache_months": "{count} months"
 }

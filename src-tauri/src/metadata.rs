@@ -43,8 +43,26 @@ pub struct VideoMetadata {
     pub language: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    // ─── TV episode-level info ──────────────────────────────────────
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub season_number: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub episode_number: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub episode_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub episode_overview: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub episode_still: Option<String>,
     #[serde(default)]
     pub images: MetadataImages,
+    // ─── File-level info (always available without API) ──────────────
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_size_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
     /// Which provider was used to fetch this metadata
     pub provider: String,
     /// ISO 8601 timestamp of when this metadata was fetched
@@ -83,13 +101,19 @@ pub struct MetadataImages {
 struct ParsedFilename {
     title: String,
     year: Option<u32>,
+    /// If the filename matches a TV series pattern (S01E02, etc.)
+    is_tv: bool,
+    season: Option<u32>,
+    episode: Option<u32>,
 }
 
-/// Parse a video filename into a title and optional year.
+/// Parse a video filename into a title, optional year, and TV series info.
 /// Handles formats like:
 ///   "Movie.Name.2024.1080p.BluRay.x264.mkv"
 ///   "Movie Name (2024).mp4"
 ///   "Movie_Name_2024_720p.mkv"
+///   "Series.Name.S01E05.1080p.WEB-DL.mkv"
+///   "Series.Name.S02E10.CUSTOM.MULTi.1080p.mkv"
 fn parse_filename(filename: &str) -> ParsedFilename {
     // Remove extension
     let name = filename
@@ -97,6 +121,40 @@ fn parse_filename(filename: &str) -> ParsedFilename {
         .map(|(name, _ext)| name)
         .unwrap_or(filename);
 
+    // ─── Detect TV series pattern (S01E02, S1E5, etc.) ──────────────
+    let tv_re = Regex::new(r"(?i)[\.\s_\-]S(\d{1,2})E(\d{1,3})").unwrap();
+    let mut is_tv = false;
+    let mut season: Option<u32> = None;
+    let mut episode: Option<u32> = None;
+    let mut tv_title_end: Option<usize> = None;
+
+    if let Some(caps) = tv_re.captures(name) {
+        is_tv = true;
+        season = caps[1].parse().ok();
+        episode = caps[2].parse().ok();
+        tv_title_end = caps.get(0).map(|m| m.start());
+    }
+
+    // If it's a TV show, extract title from before the S01E02 pattern
+    if is_tv {
+        let title_raw = if let Some(end) = tv_title_end {
+            &name[..end]
+        } else {
+            name
+        };
+
+        let title = clean_title(title_raw);
+
+        return ParsedFilename {
+            title,
+            year: None,
+            is_tv,
+            season,
+            episode,
+        };
+    }
+
+    // ─── Movie: extract year ────────────────────────────────────────
     // Try to extract year in parentheses: "Movie Name (2024)"
     let year_paren_re = Regex::new(r"\((\d{4})\)").unwrap();
     // Try to extract year after separators: "Movie.Name.2024.stuff"
@@ -142,9 +200,9 @@ fn parse_filename(filename: &str) -> ParsedFilename {
     let title_raw = if let Some(end) = title_end {
         &name[..end]
     } else {
-        // Remove common quality/codec indicators
+        // Remove common quality/codec/release indicators
         let quality_re =
-            Regex::new(r"[\.\s_\-](1080p|720p|2160p|4K|BluRay|BRRip|HDRip|WEBRip|WEB-DL|DVDRip|HDTV|CAM|TS|HC|x264|x265|H\.?264|H\.?265|HEVC|AAC|AC3|DTS|REMUX|PROPER|REPACK|EXTENDED|UNRATED|DIRECTORS\.?CUT|10bit).*$")
+            Regex::new(r"(?i)[\.\s_\-](1080p|720p|2160p|4K|BluRay|BRRip|HDRip|WEBRip|WEB[\-\.]?DL|DVDRip|HDTV|CAM|TS|HC|x264|x265|H\.?264|H\.?265|HEVC|AAC\d?\.?\d?|AC3|DTS|REMUX|PROPER|REPACK|EXTENDED|UNRATED|DIRECTORS\.?CUT|10bit|CUSTOM|MULTi|FRENCH|VOSTFR|SUBFRENCH|TRUEFRENCH|iNTERNAL|FiXED|AMZN|NF|DSNP|HMAX|ATVP|PCOK|WEBRiP).*$")
                 .unwrap();
         if let Some(m) = quality_re.find(name) {
             &name[..m.start()]
@@ -153,18 +211,74 @@ fn parse_filename(filename: &str) -> ParsedFilename {
         }
     };
 
-    // Replace dots, underscores, hyphens with spaces and trim
-    let title = title_raw
-        .replace('.', " ")
+    let title = clean_title(title_raw);
+
+    ParsedFilename {
+        title,
+        year,
+        is_tv: false,
+        season: None,
+        episode: None,
+    }
+}
+
+/// Clean a raw title string: replace separators with spaces, trim.
+fn clean_title(raw: &str) -> String {
+    raw.replace('.', " ")
         .replace('_', " ")
         .replace('-', " ")
         .split_whitespace()
         .collect::<Vec<&str>>()
         .join(" ")
         .trim()
-        .to_string();
+        .to_string()
+}
 
-    ParsedFilename { title, year }
+// ─── Built-in TMDB API key ──────────────────────────────────────────────────
+// Like Jellyfin/Kodi — rate limit is per-IP, not per-key.
+// Users can override with their own key in settings.
+// Injected at compile time via TMDB_API_KEY env var (set in CI via GitHub Secrets).
+const TMDB_DEFAULT_API_KEY: &str = match option_env!("TMDB_API_KEY") {
+    Some(key) => key,
+    None => "",
+};
+
+// ─── Local metadata from file info ──────────────────────────────────────────
+
+/// Build a minimal VideoMetadata from filename parsing and file-level info.
+/// This is used when no API provider is available or all providers fail.
+fn build_local_metadata(entry: &media::MediaEntry) -> VideoMetadata {
+    let parsed = parse_filename(&entry.filename);
+    VideoMetadata {
+        title: parsed.title,
+        original_title: None,
+        year: parsed.year,
+        overview: None,
+        tagline: None,
+        genres: Vec::new(),
+        runtime_minutes: None,
+        rating: None,
+        vote_count: None,
+        release_date: None,
+        imdb_id: None,
+        tmdb_id: None,
+        cast: Vec::new(),
+        crew: Vec::new(),
+        studios: Vec::new(),
+        language: None,
+        status: None,
+        season_number: parsed.season,
+        episode_number: parsed.episode,
+        episode_title: None,
+        episode_overview: None,
+        episode_still: None,
+        images: MetadataImages::default(),
+        file_size_bytes: Some(entry.size_bytes),
+        container: Some(entry.extension.clone()),
+        file_path: Some(entry.path.clone()),
+        provider: "local".to_string(),
+        fetched_at: chrono::Local::now().to_rfc3339(),
+    }
 }
 
 // ─── TMDB API ───────────────────────────────────────────────────────────────
@@ -387,7 +501,15 @@ fn fetch_from_tmdb(
             .collect(),
         language: detail.original_language,
         status: detail.status,
+        season_number: None,
+        episode_number: None,
+        episode_title: None,
+        episode_overview: None,
+        episode_still: None,
         images: MetadataImages::default(),
+        file_size_bytes: None,
+        container: None,
+        file_path: None,
         provider: "tmdb".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
     };
@@ -426,6 +548,288 @@ fn download_tmdb_image(
     fs::write(save_path, &bytes).map_err(|e| format!("Failed to save image: {}", e))?;
 
     Ok(())
+}
+
+// ─── TMDB TV Search ─────────────────────────────────────────────────────────
+
+#[derive(Deserialize, Debug)]
+struct TmdbTvSearchResult {
+    results: Vec<TmdbTvShow>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct TmdbTvShow {
+    id: u64,
+    name: Option<String>,
+    original_name: Option<String>,
+    overview: Option<String>,
+    first_air_date: Option<String>,
+    vote_average: Option<f64>,
+    vote_count: Option<u32>,
+    genre_ids: Option<Vec<u32>>,
+    poster_path: Option<String>,
+    backdrop_path: Option<String>,
+    original_language: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct TmdbTvDetail {
+    id: u64,
+    name: Option<String>,
+    original_name: Option<String>,
+    overview: Option<String>,
+    tagline: Option<String>,
+    first_air_date: Option<String>,
+    episode_run_time: Option<Vec<u32>>,
+    vote_average: Option<f64>,
+    vote_count: Option<u32>,
+    genres: Option<Vec<TmdbGenre>>,
+    poster_path: Option<String>,
+    backdrop_path: Option<String>,
+    original_language: Option<String>,
+    status: Option<String>,
+    production_companies: Option<Vec<TmdbCompany>>,
+    credits: Option<TmdbCredits>,
+    number_of_seasons: Option<u32>,
+    number_of_episodes: Option<u32>,
+}
+
+// ─── TMDB Episode detail ────────────────────────────────────────────────────
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct TmdbEpisodeDetail {
+    name: Option<String>,
+    overview: Option<String>,
+    still_path: Option<String>,
+    air_date: Option<String>,
+    episode_number: Option<u32>,
+    season_number: Option<u32>,
+    vote_average: Option<f64>,
+}
+
+/// Fetch episode-specific details from TMDB
+fn fetch_episode_from_tmdb(
+    client: &reqwest::blocking::Client,
+    api_key: &str,
+    series_id: u64,
+    season: u32,
+    episode: u32,
+) -> Result<Option<TmdbEpisodeDetail>, String> {
+    let url = format!(
+        "{}/tv/{}/season/{}/episode/{}?api_key={}",
+        TMDB_BASE_URL, series_id, season, episode, api_key
+    );
+
+    log::info!(
+        "[Metadata/TMDB] Fetching episode details: S{:02}E{:02} (series_id={})",
+        season, episode, series_id
+    );
+
+    let resp = client
+        .get(&url)
+        .send()
+        .map_err(|e| format!("TMDB episode request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("TMDB episode returned status {}", resp.status()));
+    }
+
+    let detail: TmdbEpisodeDetail = resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB episode response: {}", e))?;
+
+    Ok(Some(detail))
+}
+
+fn fetch_tv_from_tmdb(
+    client: &reqwest::blocking::Client,
+    api_key: &str,
+    title: &str,
+    season: Option<u32>,
+    episode: Option<u32>,
+) -> Result<Option<TmdbFetchResult>, String> {
+    // Search for the TV show
+    let url = format!(
+        "{}/search/tv?api_key={}&query={}",
+        TMDB_BASE_URL,
+        api_key,
+        urlencoded(title)
+    );
+
+    log::info!("[Metadata/TMDB] TV search: \"{}\"", title);
+
+    let resp = client
+        .get(&url)
+        .send()
+        .map_err(|e| format!("TMDB TV search request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("TMDB TV search returned status {}", resp.status()));
+    }
+
+    let search: TmdbTvSearchResult = resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB TV search response: {}", e))?;
+
+    let show = match search.results.first() {
+        Some(s) => s,
+        None => {
+            log::info!("[Metadata/TMDB] No TV results found for \"{}\"", title);
+            return Ok(None);
+        }
+    };
+
+    // Get detailed info with credits
+    let detail_url = format!(
+        "{}/tv/{}?api_key={}&append_to_response=credits",
+        TMDB_BASE_URL, show.id, api_key
+    );
+
+    let detail_resp = client
+        .get(&detail_url)
+        .send()
+        .map_err(|e| format!("TMDB TV detail request failed: {}", e))?;
+
+    if !detail_resp.status().is_success() {
+        return Err(format!(
+            "TMDB TV detail returned status {}",
+            detail_resp.status()
+        ));
+    }
+
+    let detail: TmdbTvDetail = detail_resp
+        .json()
+        .map_err(|e| format!("Failed to parse TMDB TV detail response: {}", e))?;
+
+    // Parse year from first_air_date
+    let year = detail
+        .first_air_date
+        .as_deref()
+        .and_then(|d| d.split('-').next())
+        .and_then(|y| y.parse::<u32>().ok());
+
+    // Build cast list (top 10)
+    let cast = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.cast.as_ref())
+        .map(|c| {
+            c.iter()
+                .take(10)
+                .map(|a| CastMember {
+                    name: a.name.clone(),
+                    character: a.character.clone(),
+                    profile_path: a.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Build crew list (creators, writers)
+    let crew = detail
+        .credits
+        .as_ref()
+        .and_then(|c| c.crew.as_ref())
+        .map(|c| {
+            c.iter()
+                .filter(|m| {
+                    matches!(
+                        m.job.as_deref(),
+                        Some("Director")
+                            | Some("Writer")
+                            | Some("Screenplay")
+                            | Some("Executive Producer")
+                    )
+                })
+                .take(10)
+                .map(|m| CrewMember {
+                    name: m.name.clone(),
+                    job: m.job.clone(),
+                    profile_path: m.profile_path.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let runtime = detail
+        .episode_run_time
+        .as_ref()
+        .and_then(|r| r.first().copied());
+
+    // Fetch episode-specific details if season and episode are known
+    let mut episode_title = None;
+    let mut episode_overview = None;
+    let mut episode_still = None;
+    let mut ep_season = None;
+    let mut ep_episode = None;
+
+    if let (Some(s), Some(e)) = (season, episode) {
+        match fetch_episode_from_tmdb(client, api_key, detail.id, s, e) {
+            Ok(Some(ep)) => {
+                log::info!(
+                    "[Metadata/TMDB] Episode S{:02}E{:02}: \"{}\"",
+                    s, e, ep.name.as_deref().unwrap_or("?")
+                );
+                episode_title = ep.name;
+                episode_overview = ep.overview;
+                episode_still = ep.still_path;
+                ep_season = Some(s);
+                ep_episode = Some(e);
+            }
+            Ok(None) => log::info!("[Metadata/TMDB] No episode data for S{:02}E{:02}", s, e),
+            Err(err) => log::warn!("[Metadata/TMDB] Episode fetch error: {}", err),
+        }
+    }
+
+    let metadata = VideoMetadata {
+        title: detail.name.unwrap_or_default(),
+        original_title: detail.original_name,
+        year,
+        overview: detail.overview,
+        tagline: detail.tagline,
+        genres: detail
+            .genres
+            .unwrap_or_default()
+            .into_iter()
+            .map(|g| g.name)
+            .collect(),
+        runtime_minutes: runtime,
+        rating: detail.vote_average,
+        vote_count: detail.vote_count,
+        release_date: detail.first_air_date,
+        imdb_id: None,
+        tmdb_id: Some(detail.id),
+        cast,
+        crew,
+        studios: detail
+            .production_companies
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| c.name)
+            .collect(),
+        language: detail.original_language,
+        status: detail.status,
+        season_number: ep_season,
+        episode_number: ep_episode,
+        episode_title,
+        episode_overview,
+        episode_still,
+        images: MetadataImages::default(),
+        file_size_bytes: None,
+        container: None,
+        file_path: None,
+        provider: "tmdb".to_string(),
+        fetched_at: chrono::Local::now().to_rfc3339(),
+    };
+
+    Ok(Some(TmdbFetchResult {
+        metadata,
+        poster_path: detail.poster_path,
+        backdrop_path: detail.backdrop_path,
+    }))
 }
 
 // ─── OMDb API ───────────────────────────────────────────────────────────────
@@ -590,7 +994,15 @@ fn fetch_from_omdb(
         studios,
         language: result.language.filter(|l| l != "N/A"),
         status: None,
+        season_number: None,
+        episode_number: None,
+        episode_title: None,
+        episode_overview: None,
+        episode_still: None,
         images: MetadataImages::default(),
+        file_size_bytes: None,
+        container: None,
+        file_path: None,
         provider: "omdb".to_string(),
         fetched_at: chrono::Local::now().to_rfc3339(),
     };
@@ -662,10 +1074,46 @@ fn get_meta_dir(app: &AppHandle, user_id: &str, media_id: &str) -> Result<PathBu
     Ok(get_metas_dir(app, user_id)?.join(media_id))
 }
 
-/// Check if metadata exists for a given media entry
-fn has_metadata(app: &AppHandle, user_id: &str, media_id: &str) -> bool {
+/// Check if metadata exists for a given media entry.
+/// Returns true only if a meta.json exists AND was fetched from a real API provider
+/// AND is not older than `cache_months` months.
+/// Local-only metadata (from filename parsing) is treated as "missing" so it gets
+/// re-fetched when an API provider becomes available.
+fn has_rich_metadata(app: &AppHandle, user_id: &str, media_id: &str, cache_months: u32) -> bool {
     if let Ok(dir) = get_meta_dir(app, user_id, media_id) {
-        dir.join("meta.json").exists()
+        let meta_path = dir.join("meta.json");
+        if !meta_path.exists() {
+            return false;
+        }
+        // Check if this was fetched from a real API provider (not just local)
+        if let Ok(raw) = fs::read_to_string(&meta_path) {
+            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&raw) {
+                let provider = meta.get("provider").and_then(|p| p.as_str()).unwrap_or("local");
+                if provider == "local" {
+                    return false;
+                }
+                // Check if cached metadata is still fresh
+                if let Some(fetched_at) = meta.get("fetched_at").and_then(|f| f.as_str()) {
+                    if let Ok(fetched_time) = chrono::DateTime::parse_from_rfc3339(fetched_at) {
+                        let now = chrono::Local::now();
+                        let age = now.signed_duration_since(fetched_time);
+                        let max_age = chrono::Duration::days(cache_months as i64 * 30);
+                        if age > max_age {
+                            log::info!(
+                                "[Metadata] Cache expired for {} (age: {} days, max: {} days)",
+                                media_id,
+                                age.num_days(),
+                                max_age.num_days()
+                            );
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+        // If we can't determine the provider, treat as existing
+        true
     } else {
         false
     }
@@ -761,38 +1209,61 @@ fn save_metadata_and_images(
 
 // ─── Main fetch orchestration ───────────────────────────────────────────────
 
-/// Fetch metadata for a single media entry, trying providers in order
+/// Fetch metadata for a single media entry, trying providers in order.
+/// If no provider succeeds (or none are configured), falls back to local
+/// metadata extracted from the filename and file info.
 fn fetch_metadata_for_entry(
     client: &reqwest::blocking::Client,
     app: &AppHandle,
     user_id: &str,
-    media_id: &str,
-    filename: &str,
+    entry: &media::MediaEntry,
     providers: &[media::MetadataProviderConfig],
 ) -> Result<bool, String> {
-    let parsed = parse_filename(filename);
+    let parsed = parse_filename(&entry.filename);
     log::info!(
-        "[Metadata] Parsed filename \"{}\": title=\"{}\", year={:?}",
-        filename,
+        "[Metadata] Parsed filename \"{}\": title=\"{}\", year={:?}, is_tv={}, season={:?}, episode={:?}",
+        entry.filename,
         parsed.title,
-        parsed.year
+        parsed.year,
+        parsed.is_tv,
+        parsed.season,
+        parsed.episode
     );
 
+    // Try each enabled provider
     for provider in providers {
-        if !provider.enabled || provider.api_key.is_empty() {
+        if !provider.enabled {
             continue;
         }
 
         match provider.id.as_str() {
             "tmdb" => {
-                match fetch_from_tmdb(client, &provider.api_key, &parsed.title, parsed.year) {
+                // Use user key if provided, otherwise fall back to built-in key
+                let api_key = if provider.api_key.is_empty() {
+                    TMDB_DEFAULT_API_KEY.to_string()
+                } else {
+                    provider.api_key.clone()
+                };
+
+                // Use TV search for series, movie search for movies
+                let tmdb_result = if parsed.is_tv {
+                    fetch_tv_from_tmdb(client, &api_key, &parsed.title, parsed.season, parsed.episode)
+                } else {
+                    fetch_from_tmdb(client, &api_key, &parsed.title, parsed.year)
+                };
+
+                match tmdb_result {
                     Ok(Some(result)) => {
                         let mut metadata = result.metadata;
+                        // Enrich with file-level info
+                        metadata.file_size_bytes = Some(entry.size_bytes);
+                        metadata.container = Some(entry.extension.clone());
+                        metadata.file_path = Some(entry.path.clone());
                         save_metadata_and_images(
                             client,
                             app,
                             user_id,
-                            media_id,
+                            &entry.id,
                             &mut metadata,
                             "tmdb",
                             result.poster_path.as_deref(),
@@ -815,14 +1286,22 @@ fn fetch_metadata_for_entry(
                 }
             }
             "omdb" => {
+                // OMDb has no built-in key — skip if user didn't provide one
+                if provider.api_key.is_empty() {
+                    continue;
+                }
                 match fetch_from_omdb(client, &provider.api_key, &parsed.title, parsed.year) {
                     Ok(Some(result)) => {
                         let mut metadata = result.metadata;
+                        // Enrich with file-level info
+                        metadata.file_size_bytes = Some(entry.size_bytes);
+                        metadata.container = Some(entry.extension.clone());
+                        metadata.file_path = Some(entry.path.clone());
                         save_metadata_and_images(
                             client,
                             app,
                             user_id,
-                            media_id,
+                            &entry.id,
                             &mut metadata,
                             "omdb",
                             None,
@@ -851,25 +1330,39 @@ fn fetch_metadata_for_entry(
         }
     }
 
+    // No provider succeeded — save local-only metadata from filename + file info
     log::info!(
-        "[Metadata] No provider could fetch metadata for \"{}\"",
-        filename
+        "[Metadata] No API provider available for \"{}\", saving local metadata",
+        entry.filename
     );
-    Ok(false)
+    let metadata = build_local_metadata(entry);
+    let meta_dir = get_meta_dir(app, user_id, &entry.id)?;
+    fs::create_dir_all(&meta_dir).map_err(|e| format!("Failed to create meta dir: {}", e))?;
+    let meta_json =
+        serde_json::to_string_pretty(&metadata).map_err(|e| format!("Failed to serialize: {}", e))?;
+    fs::write(meta_dir.join("meta.json"), meta_json)
+        .map_err(|e| format!("Failed to write meta.json: {}", e))?;
+    log::info!(
+        "[Metadata] Local metadata saved for {} (title: \"{}\")",
+        entry.id,
+        metadata.title
+    );
+    Ok(true)
 }
 
-/// Fetch metadata for all entries that are missing it
+/// Fetch metadata for all entries that are missing it.
+/// Even without API providers, creates local metadata from filename + file info.
 pub fn fetch_missing_metadata(app: &AppHandle, user_id: &str) -> Result<String, String> {
     let settings = media::get_settings(app.clone(), user_id.to_string())?;
+    let cache_months = settings.metadata_cache_months.clamp(1, 6);
     let providers: Vec<media::MetadataProviderConfig> = settings
         .metadata_providers
         .into_iter()
-        .filter(|p| p.enabled && !p.api_key.is_empty())
+        .filter(|p| p.enabled)
         .collect();
 
     if providers.is_empty() {
-        log::info!("[Metadata] No enabled metadata providers configured");
-        return Ok("No enabled metadata providers".to_string());
+        log::info!("[Metadata] No API providers configured, will use local metadata only");
     }
 
     let entries = media::get_media_library(app.clone(), user_id.to_string())?;
@@ -892,7 +1385,7 @@ pub fn fetch_missing_metadata(app: &AppHandle, user_id: &str) -> Result<String, 
             continue;
         }
 
-        if has_metadata(app, user_id, &entry.id) {
+        if has_rich_metadata(app, user_id, &entry.id, cache_months) {
             skipped += 1;
             continue;
         }
@@ -901,8 +1394,7 @@ pub fn fetch_missing_metadata(app: &AppHandle, user_id: &str) -> Result<String, 
             &client,
             app,
             user_id,
-            &entry.id,
-            &entry.filename,
+            entry,
             &providers,
         ) {
             Ok(true) => fetched += 1,
@@ -918,7 +1410,9 @@ pub fn fetch_missing_metadata(app: &AppHandle, user_id: &str) -> Result<String, 
         }
 
         // Small delay between requests to avoid rate limiting
-        std::thread::sleep(std::time::Duration::from_millis(250));
+        if !providers.is_empty() {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
     }
 
     let result = format!(
