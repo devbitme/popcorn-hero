@@ -83,6 +83,7 @@
 	<!-- Left: Navigation links -->
 	{#if $currentUser}
 	<div class="flex items-center gap-6">
+		<img src="/logo-circle.svg" alt="Logo" class="size-12 -my-3" />
 		<a href="/" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/' ? 'font-bold' : 'font-medium'}">{m.nav_home()}</a>
 		<a href="/series" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/series' ? 'font-bold' : 'font-medium'}">{m.nav_series()}</a>
 		<a href="/movies" class="text-sm text-foreground hover:text-foreground/70 transition-colors {$page.url.pathname === '/movies' ? 'font-bold' : 'font-medium'}">{m.nav_movies()}</a>
