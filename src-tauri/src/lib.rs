@@ -62,6 +62,7 @@ pub fn run() {
             media::fetch_all_metadata,
             media::get_media_metadata,
             media::get_library_with_metadata,
+            media::cleanup_old_logs,
             peer::peer_start,
             peer::peer_stop,
             peer::peer_generate_ticket,

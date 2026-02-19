@@ -87,6 +87,10 @@
 			invoke("start_media_watcher", { userId }).catch((e: unknown) => {
 				warn("[Layout] Failed to start media watcher: " + String(e));
 			});
+			// Cleanup old log files based on retention setting
+			invoke("cleanup_old_logs", { userId }).catch((e: unknown) => {
+				warn("[Layout] Log cleanup failed: " + String(e));
+			});
 			info("[Layout] Media watcher init for user " + userId);
 		}
 

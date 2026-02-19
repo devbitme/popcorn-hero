@@ -107,6 +107,9 @@ pub struct Settings {
     /// How many months metadata should be cached before being refreshed (1-6)
     #[serde(default = "default_cache_months")]
     pub metadata_cache_months: u32,
+    /// How many months log files should be retained before being deleted (1-12)
+    #[serde(default = "default_log_retention_months")]
+    pub log_retention_months: u32,
 }
 
 fn default_true() -> bool {
@@ -117,6 +120,10 @@ fn default_cache_months() -> u32 {
     1
 }
 
+fn default_log_retention_months() -> u32 {
+    3
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -125,6 +132,7 @@ impl Default for Settings {
             live_scan: true,
             metadata_providers: default_metadata_providers(),
             metadata_cache_months: 1,
+            log_retention_months: 3,
         }
     }
 }
@@ -500,4 +508,56 @@ pub fn get_library_with_metadata(app: AppHandle, user_id: String) -> Result<Vec<
         user_id
     );
     Ok(results)
+}
+
+/// Delete log files older than the configured retention period
+#[tauri::command]
+pub fn cleanup_old_logs(app: AppHandle, user_id: String) -> Result<u32, String> {
+    let settings = load_settings(&app, &user_id)?;
+    let retention_months = settings.log_retention_months.max(1).min(12);
+
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get log directory: {}", e))?;
+
+    if !log_dir.exists() {
+        log::info!("[Logs] Log directory does not exist, nothing to clean");
+        return Ok(0);
+    }
+
+    let cutoff = chrono::Local::now()
+        .checked_sub_months(chrono::Months::new(retention_months))
+        .ok_or_else(|| "Failed to compute cutoff date".to_string())?
+        .format("%Y-%m-%d")
+        .to_string();
+
+    let mut deleted = 0u32;
+
+    let entries = fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log dir: {}", e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("log") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            // Log files are named YYYY-MM-DD.log
+            if stem.len() == 10 && stem < cutoff.as_str() {
+                if let Err(e) = fs::remove_file(&path) {
+                    log::warn!("[Logs] Failed to delete old log file {:?}: {}", path, e);
+                } else {
+                    log::info!("[Logs] Deleted old log file: {:?}", path);
+                    deleted += 1;
+                }
+            }
+        }
+    }
+
+    log::info!(
+        "[Logs] Cleanup complete: {} file(s) deleted (retention: {} months, cutoff: {})",
+        deleted,
+        retention_months,
+        cutoff
+    );
+    Ok(deleted)
 }

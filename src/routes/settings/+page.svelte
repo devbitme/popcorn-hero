@@ -34,6 +34,7 @@
 		live_scan: boolean;
 		metadata_providers: MetadataProviderConfig[];
 		metadata_cache_months: number;
+		log_retention_months: number;
 	}
 
 	interface ScanResult {
@@ -93,6 +94,7 @@
 	let liveScan = $state(true);
 	let metadataProviders = $state<MetadataProviderConfig[]>([]);
 	let metadataCacheMonths = $state(1);
+	let logRetentionMonths = $state(3);
 	let isLoading = $state(true);
 	let isScanning = $state(false);
 	let isFetchingMetadata = $state(false);
@@ -101,6 +103,15 @@
 
 	onMount(async () => {
 		await loadConfig();
+		// Cleanup old logs on settings page load
+		try {
+			const userId = $currentUser?.id;
+			if (userId) {
+				await invoke("cleanup_old_logs", { userId });
+			}
+		} catch (error) {
+			warn("[Settings] Log cleanup on load failed: " + String(error));
+		}
 	});
 
 	async function loadConfig() {
@@ -113,6 +124,7 @@
 			liveScan = settings.live_scan;
 			metadataProviders = settings.metadata_providers ?? [];
 			metadataCacheMonths = settings.metadata_cache_months ?? 1;
+			logRetentionMonths = settings.log_retention_months ?? 3;
 			info("[Settings] Loaded settings: " + folders.length + " folder(s), scanOnStartup=" + scanOnStartup + ", liveScan=" + liveScan + ", providers=" + metadataProviders.length);
 		} catch (error) {
 			warn("[Settings] Failed to load settings: " + String(error));
@@ -155,7 +167,8 @@
 				scan_on_startup: scanOnStartup,
 				live_scan: liveScan,
 				metadata_providers: metadataProviders,
-				metadata_cache_months: metadataCacheMonths
+				metadata_cache_months: metadataCacheMonths,
+				log_retention_months: logRetentionMonths
 			};
 			await invoke("update_settings", { userId, settings });
 			info("[Settings] Settings saved: scanOnStartup=" + scanOnStartup + ", liveScan=" + liveScan);
@@ -276,6 +289,27 @@
 			metadataCacheMonths = months;
 			await saveSettingsToggle();
 			info("[Settings] Cache duration updated to " + months + " month(s)");
+		}
+	}
+
+	async function handleLogRetentionChange(value: string) {
+		const months = Number.parseInt(value, 10);
+		if (months >= 1 && months <= 12) {
+			logRetentionMonths = months;
+			await saveSettingsToggle();
+			info("[Settings] Log retention updated to " + months + " month(s)");
+			// Trigger log cleanup with the new retention setting
+			try {
+				const userId = $currentUser?.id;
+				if (userId) {
+					const deleted = await invoke<number>("cleanup_old_logs", { userId });
+					if (deleted > 0) {
+						info("[Settings] Cleaned up " + deleted + " old log file(s)");
+					}
+				}
+			} catch (error) {
+				warn("[Settings] Log cleanup failed: " + String(error));
+			}
 		}
 	}
 </script>
@@ -560,6 +594,49 @@
 					</div>
 				</div>
 			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<!-- Log Retention -->
+	<Card.Root class="mt-4">
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2">
+				<Trash2 class="size-5" />
+				{m.settings_logs_title()}
+			</Card.Title>
+			<Card.Description>
+				{m.settings_logs_description()}
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div class="flex items-center justify-between gap-4">
+				<div class="space-y-0.5">
+					<Label for="log-retention">{m.settings_logs_title()}</Label>
+					<p class="text-sm text-muted-foreground">
+						{m.settings_logs_description()}
+					</p>
+				</div>
+				<Select.Root
+					type="single"
+					value={String(logRetentionMonths)}
+					onValueChange={handleLogRetentionChange}
+				>
+					<Select.Trigger class="w-35" id="log-retention">
+						{logRetentionMonths === 1
+							? m.settings_logs_month({ count: "1" })
+							: m.settings_logs_months({ count: String(logRetentionMonths) })}
+					</Select.Trigger>
+					<Select.Content>
+						{#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as months}
+							<Select.Item value={String(months)}>
+								{months === 1
+									? m.settings_logs_month({ count: "1" })
+									: m.settings_logs_months({ count: String(months) })}
+							</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
 		</Card.Content>
 	</Card.Root>
 </div>
