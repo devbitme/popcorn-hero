@@ -5,7 +5,7 @@
 	import { attachConsole, info, warn } from "@tauri-apps/plugin-log";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import LanguageSwitcher from "@/lib/components/app/language-switcher.svelte";
+	import Navbar from "@/lib/components/app/navbar.svelte";
 	import UserCreateForm from "@/lib/components/app/user-create-form.svelte";
 	import UserLoginForm from "@/lib/components/app/user-login-form.svelte";
 	import DevToolbar from "@/lib/components/dev/dev-toolbar.svelte";
@@ -100,19 +100,19 @@
 	<!-- Loading state -->
 {:else if $currentUser}
 	<div class="h-screen overflow-y-auto">
-		<LanguageSwitcher />
+		<Navbar />
 		<main>
 			{@render children()}
 		</main>
 	</div>
 {:else if existingUser}
 	<div class="h-screen overflow-hidden flex flex-col dark:bg-background">
-		<LanguageSwitcher />
+		<Navbar />
 		<UserLoginForm userId={existingUser.id} username={existingUser.username} />
 	</div>
 {:else}
 	<div class="h-screen overflow-hidden flex flex-col">
-		<LanguageSwitcher />
+		<Navbar />
 		<UserCreateForm />
 	</div>
 {/if}

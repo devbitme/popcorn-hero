@@ -2,16 +2,51 @@
 	import CircleUserIcon from "@lucide/svelte/icons/circle-user";
 	import Moon from "@lucide/svelte/icons/moon";
 	import Sun from "@lucide/svelte/icons/sun";
+	import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 	import { info } from "@tauri-apps/plugin-log";
+	import { onMount } from "svelte";
 	import * as Icon from "svelte-flag-icons";
+	import { goto } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { getLocale, locales, setLocale } from "$lib/paraglide/runtime.js";
-	import { currentUser } from "$lib/stores/user";
+	import { avatarVersion, currentUser } from "$lib/stores/user";
+
+	let avatarUrl = $state<string | null>(null);
 
 	let isDark = $state(typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
+
+	onMount(async () => {
+		await loadAvatar();
+	});
+
+	// Reload avatar when user changes or avatar is updated
+	$effect(() => {
+		const user = $currentUser;
+		const _version = $avatarVersion;
+		if (user) {
+			loadAvatar();
+		} else {
+			avatarUrl = null;
+		}
+	});
+
+	async function loadAvatar() {
+		try {
+			const userId = $currentUser?.id;
+			if (!userId) return;
+			const path = await invoke<string | null>("get_avatar", { userId });
+			if (path) {
+				avatarUrl = convertFileSrc(path) + "?t=" + Date.now();
+			} else {
+				avatarUrl = null;
+			}
+		} catch {
+			avatarUrl = null;
+		}
+	}
 
 	function toggleDarkMode() {
 		isDark = !isDark;
@@ -63,17 +98,21 @@
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
-<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full text-foreground hover:text-foreground/70 hover:bg-foreground/10">
-						<CircleUserIcon class="size-6" strokeWidth={1.5} />
+<Button {...props} variant="ghost" size="icon-lg" class="cursor-pointer rounded-full text-foreground hover:text-foreground/70 hover:bg-foreground/10 overflow-hidden">
+						{#if avatarUrl}
+							<img src={avatarUrl} alt="Avatar" class="size-6 rounded-full object-cover" />
+						{:else}
+							<CircleUserIcon class="size-6" strokeWidth={1.5} />
+						{/if}
 					</Button>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end">
-				<DropdownMenu.Item>
-					<a href="/account">{m.user_account()}</a>
+				<DropdownMenu.Item class="cursor-pointer" onclick={() => goto("/account")}>
+					{m.user_account()}
 				</DropdownMenu.Item>
-				<DropdownMenu.Item>
-					<a href="/settings">{m.user_settings()}</a>
+				<DropdownMenu.Item class="cursor-pointer" onclick={() => goto("/settings")}>
+					{m.user_settings()}
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item

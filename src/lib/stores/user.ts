@@ -40,3 +40,9 @@ function createPersistentUser() {
 
 export const currentUser = createPersistentUser();
 export const isUserLoading = writable(true);
+
+/** Incremented whenever the avatar changes, so all components can react */
+export const avatarVersion = writable(0);
+export function notifyAvatarChanged() {
+	avatarVersion.update((v) => v + 1);
+}

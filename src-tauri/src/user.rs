@@ -211,3 +211,189 @@ pub fn verify_pin(app: AppHandle, user_id: String, pin: String) -> Result<UserPr
 
     Ok(profile)
 }
+
+/// Update the username for a user (requires current PIN for re-encryption)
+#[tauri::command]
+pub fn update_username(
+    app: AppHandle,
+    user_id: String,
+    new_username: String,
+    pin: String,
+) -> Result<UserProfile, String> {
+    // Validate new username
+    if new_username.is_empty() {
+        return Err("Username cannot be empty".to_string());
+    }
+    if !new_username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(
+            "Username can only contain letters, numbers, hyphens and underscores".to_string(),
+        );
+    }
+
+    // Verify PIN first
+    let _profile = verify_pin(app.clone(), user_id.clone(), pin.clone())?;
+
+    let user_dir = get_user_dir(&app, &user_id)?;
+
+    // Build updated profile
+    let updated = UserProfile {
+        id: user_id.clone(),
+        username: new_username.clone(),
+        created_at: _profile.created_at,
+    };
+
+    // Re-encrypt profile with the same PIN
+    let profile_json = serde_json::to_string(&updated).map_err(|e| e.to_string())?;
+    let encrypted = encrypt(profile_json.as_bytes(), &pin)?;
+    let profile_path = user_dir.join("profile.enc");
+    fs::write(&profile_path, &encrypted).map_err(|e| e.to_string())?;
+
+    // Update meta.json
+    let meta = serde_json::json!({ "id": user_id, "username": new_username });
+    let meta_path = user_dir.join("meta.json");
+    fs::write(
+        &meta_path,
+        serde_json::to_string_pretty(&meta).unwrap(),
+    )
+    .map_err(|e| e.to_string())?;
+
+    log::info!(
+        "[User] Username updated to '{}' for user {}",
+        new_username,
+        user_id
+    );
+
+    Ok(updated)
+}
+
+/// Update the PIN for a user
+#[tauri::command]
+pub fn update_pin(
+    app: AppHandle,
+    user_id: String,
+    current_pin: String,
+    new_pin: String,
+) -> Result<(), String> {
+    // Validate new PIN
+    if new_pin.len() != 4 || !new_pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err("PIN must be exactly 4 digits".to_string());
+    }
+
+    // Verify current PIN
+    let profile = verify_pin(app.clone(), user_id.clone(), current_pin)?;
+
+    let user_dir = get_user_dir(&app, &user_id)?;
+
+    // Re-encrypt profile with new PIN
+    let profile_json = serde_json::to_string(&profile).map_err(|e| e.to_string())?;
+    let encrypted = encrypt(profile_json.as_bytes(), &new_pin)?;
+    let profile_path = user_dir.join("profile.enc");
+    fs::write(&profile_path, &encrypted).map_err(|e| e.to_string())?;
+
+    // Update PIN hash
+    let pin_hash = derive_key(&new_pin);
+    let hash_path = user_dir.join("pin.hash");
+    fs::write(&hash_path, &pin_hash).map_err(|e| e.to_string())?;
+
+    log::info!("[User] PIN updated for user {}", user_id);
+
+    Ok(())
+}
+
+/// Save an avatar image for a user
+#[tauri::command]
+pub fn save_avatar(app: AppHandle, user_id: String, source_path: String) -> Result<String, String> {
+    let user_dir = get_user_dir(&app, &user_id)?;
+    if !user_dir.exists() {
+        return Err("User directory not found".to_string());
+    }
+
+    let source = std::path::Path::new(&source_path);
+    if !source.is_file() {
+        return Err("Source file does not exist".to_string());
+    }
+
+    // Validate extension
+    let ext = source
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    if !["jpg", "jpeg", "png", "webp", "gif", "bmp"].contains(&ext.as_str()) {
+        return Err("Unsupported image format. Use JPG, PNG, WebP, GIF or BMP.".to_string());
+    }
+
+    let avatar_filename = format!("avatar.{}", ext);
+    let avatar_path = user_dir.join(&avatar_filename);
+
+    // Remove any existing avatar with different extension
+    for existing_ext in &["jpg", "jpeg", "png", "webp", "gif", "bmp"] {
+        let old = user_dir.join(format!("avatar.{}", existing_ext));
+        if old.exists() {
+            let _ = fs::remove_file(&old);
+        }
+    }
+
+    // Copy the file
+    fs::copy(source, &avatar_path).map_err(|e| e.to_string())?;
+
+    let result_path = avatar_path.to_string_lossy().to_string();
+    log::info!("[User] Avatar saved for user {}: {}", user_id, result_path);
+
+    Ok(result_path)
+}
+
+/// Remove the avatar for a user
+#[tauri::command]
+pub fn remove_avatar(app: AppHandle, user_id: String) -> Result<(), String> {
+    let user_dir = get_user_dir(&app, &user_id)?;
+
+    for ext in &["jpg", "jpeg", "png", "webp", "gif", "bmp"] {
+        let avatar = user_dir.join(format!("avatar.{}", ext));
+        if avatar.exists() {
+            fs::remove_file(&avatar).map_err(|e| e.to_string())?;
+        }
+    }
+
+    log::info!("[User] Avatar removed for user {}", user_id);
+    Ok(())
+}
+
+/// Get the avatar path for a user (returns None if no avatar)
+#[tauri::command]
+pub fn get_avatar(app: AppHandle, user_id: String) -> Result<Option<String>, String> {
+    let user_dir = get_user_dir(&app, &user_id)?;
+
+    for ext in &["jpg", "jpeg", "png", "webp", "gif", "bmp"] {
+        let avatar = user_dir.join(format!("avatar.{}", ext));
+        if avatar.exists() {
+            return Ok(Some(avatar.to_string_lossy().to_string()));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Pick an image file using native dialog
+#[tauri::command]
+pub fn pick_image() -> Result<Option<String>, String> {
+    let dialog = rfd::FileDialog::new()
+        .set_title("Select an image")
+        .add_filter("Images", &["jpg", "jpeg", "png", "webp", "gif", "bmp"]);
+
+    match dialog.pick_file() {
+        Some(path) => {
+            let path_str = path.to_string_lossy().to_string();
+            log::info!("[User] Image picked: {}", path_str);
+            Ok(Some(path_str))
+        }
+        None => {
+            log::info!("[User] Image picker cancelled");
+            Ok(None)
+        }
+    }
+}
