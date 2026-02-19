@@ -12,6 +12,7 @@
 	import { Label } from "$lib/components/ui/label";
 	import { Separator } from "$lib/components/ui/separator";
 	import { m } from "$lib/paraglide/messages.js";
+	import { getLocale } from "$lib/paraglide/runtime.js";
 	import { currentUser, notifyAvatarChanged } from "$lib/stores/user";
 
 	let username = $state("");
@@ -176,7 +177,7 @@
 
 	function formatDate(isoString: string): string {
 		try {
-			return new Date(isoString).toLocaleDateString(undefined, {
+			return new Date(isoString).toLocaleDateString(getLocale(), {
 				year: "numeric",
 				month: "long",
 				day: "numeric",
