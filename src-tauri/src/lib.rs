@@ -1,5 +1,6 @@
 mod media;
 mod metadata;
+mod peer;
 mod user;
 mod watcher;
 
@@ -35,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(Mutex::new(watcher::WatcherState::new())))
         .manage(Arc::new(Mutex::new(metadata::MetadataRetryState::new())))
+        .manage(Arc::new(tokio::sync::Mutex::new(peer::PeerState::new())))
         .invoke_handler(tauri::generate_handler![
             greet,
             user::check_user_exists,
@@ -60,6 +62,12 @@ pub fn run() {
             media::fetch_all_metadata,
             media::get_media_metadata,
             media::get_library_with_metadata,
+            peer::peer_start,
+            peer::peer_stop,
+            peer::peer_generate_ticket,
+            peer::peer_connect,
+            peer::peer_disconnect,
+            peer::peer_list,
         ])
         .setup(|_app| {
             log::info!("[App] Popcorn Hero started");

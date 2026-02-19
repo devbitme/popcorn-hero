@@ -10,19 +10,92 @@ The frontend is built with **Svelte** and TypeScript, while the backend leverage
 
 ### What is Iroh?
 
-Iroh lets you establish direct peer-to-peer connections whenever possible, falling back to relay servers if necessary. This gives you fast, reliable connections that are authenticated and encrypted end-to-end using QUIC.
+Iroh establishes direct peer-to-peer connections whenever possible, falling back to relay servers if necessary. All connections are authenticated and encrypted end-to-end using QUIC. It is built in Rust and used natively in this Tauri application.
 
-**Official Documentation**: https://www.iroh.computer/docs
+**Official Documentation**: https://docs.iroh.computer/
 
 ### Key Resources
 
-- **[Quickstart Guide](https://www.iroh.computer/docs/quickstart)** - Get started with Iroh quickly
-- **[Overview](https://www.iroh.computer/docs/overview)** - High level look at the problems Iroh solves
+- **[Quickstart Guide](https://docs.iroh.computer/quickstart)** - Build a ping program connecting two endpoints using tickets over DNS
+- **[Overview](https://docs.iroh.computer/overview)** - High level look at the problems Iroh solves
 - **[Protocol Registry](https://www.iroh.computer/proto)** - Iroh Protocols are pluggable extensions that build on direct connections
 - **[Awesome List](https://github.com/n0-computer/awesome-iroh)** - Projects & resources building with Iroh
-- **[FAQ](https://www.iroh.computer/docs/faq)** - Frequently asked questions
-- **[GitHub Repository](https://github.com/n0-computer/awesome-iroh)** - Iroh source code and community
+- **[FAQ](https://docs.iroh.computer/faq)** - Frequently asked questions
+- **[GitHub Repository](https://github.com/n0-computer/iroh)** - Iroh source code and community
 - **[Discord Community](https://iroh.computer/discord)** - Join the Iroh community
+
+### Core Concepts
+
+#### Endpoints
+An `iroh::Endpoint` is the main entry point. It manages networking, maintains a relay connection, and finds ways to address devices by `EndpointId`.
+
+```rust
+let endpoint = Endpoint::bind().await?;
+endpoint.online().await; // Wait until reachable by others
+```
+
+#### Tickets (iroh-tickets)
+An `EndpointTicket` wraps an endpoint's address (node ID, relay URL, direct addresses) into a serializable string for sharing. Users copy-paste this ticket to connect to each other.
+
+```rust
+use iroh_tickets::{Ticket, endpoint::EndpointTicket};
+
+// Generate a ticket from your endpoint
+let ticket = EndpointTicket::new(endpoint.addr());
+println!("{ticket}"); // Share this string
+
+// Parse a ticket received from another user
+let ticket = EndpointTicket::deserialize(&ticket_str)?;
+let addr = ticket.endpoint_addr().clone();
+```
+
+**When to use tickets**: Bootstrapping peer connections without a central server, QR codes, copy/paste flows, short-lived sessions.
+
+**When NOT to use tickets**: Long-lived connections where dialing details change. Prefer caching `EndpointID`s and let iroh resolve at runtime via discovery.
+
+#### Discovery
+Discovery resolves `EndpointID`s to addresses. Iroh supports:
+- **DNS Discovery** (enabled by default) — resolves via `dns.iroh.link`
+- **Pkarr** (enabled via DNS) — public-key addressable DNS records
+- **Local/mDNS** (disabled) — local network discovery
+- **DHT** (disabled) — BitTorrent Mainline DHT
+
+#### Protocols & Router
+Protocols define how two endpoints exchange messages, identified by an ALPN string. The `Router` dispatches incoming connections to the right protocol handler.
+
+```rust
+use iroh::protocol::Router;
+use iroh_ping::Ping;
+
+let ping = Ping::new();
+let router = Router::builder(endpoint)
+    .accept(iroh_ping::ALPN, ping)
+    .spawn();
+```
+
+#### Ping Protocol (iroh-ping)
+Lightweight diagnostic protocol to prove connectivity and measure round-trip latency between two endpoints.
+
+```rust
+let pinger = Ping::new();
+let rtt = pinger.ping(&endpoint, remote_addr).await?;
+```
+
+### Rust Crates Used
+
+| Crate | Purpose |
+|-------|---------|
+| `iroh` | Core endpoint, connections, discovery |
+| `iroh-ping` | Diagnostic ping/pong protocol |
+| `iroh-tickets` | Ticket creation and parsing |
+| `tokio` | Async runtime required by iroh |
+
+### Security Notes
+
+- Tickets contain IP addresses — sharing a ticket means sharing your IPs
+- Tickets are reusable, not single-use tokens
+- All connections are end-to-end encrypted via QUIC
+- EndpointIDs are elliptic curve public keys
 
 ## Tauri Documentation Reference
 

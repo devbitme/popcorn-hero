@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CircleUserIcon from "@lucide/svelte/icons/circle-user";
 	import Moon from "@lucide/svelte/icons/moon";
+	import Share2 from "@lucide/svelte/icons/share-2";
 	import Sun from "@lucide/svelte/icons/sun";
 	import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 	import { info } from "@tauri-apps/plugin-log";
@@ -93,6 +94,18 @@
 
 	<!-- Right: User + Language -->
 	<div class="flex items-center gap-2">
+		<!-- Peer Connect Button -->
+		{#if $currentUser}
+		<Button
+			variant="ghost"
+			size="icon-lg"
+			class="cursor-pointer rounded-full text-foreground hover:text-foreground/70 hover:bg-foreground/10 {$page.url.pathname === '/connect' ? 'bg-foreground/10' : ''}"
+			onclick={() => goto("/connect")}
+		>
+			<Share2 class="size-5" strokeWidth={1.5} />
+		</Button>
+		{/if}
+
 		<!-- Avatar / Account Menu -->
 		{#if $currentUser}
 		<DropdownMenu.Root>
