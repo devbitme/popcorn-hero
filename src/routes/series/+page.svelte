@@ -3,6 +3,7 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
 	import { onMount } from "svelte";
+	import { toast } from "svelte-sonner";
 	import MediaCard from "$lib/components/app/media-card.svelte";
 	import MediaHero from "$lib/components/app/media-hero.svelte";
 	import MediaRow from "$lib/components/app/media-row.svelte";
@@ -16,6 +17,14 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { currentUser } from "$lib/stores/user";
 	import type { MediaWithMetadata } from "$lib/types/media";
+
+	async function playMedia(item: MediaWithMetadata) {
+		try {
+			await invoke("player_open_vlc", { path: item.path });
+		} catch (e) {
+			toast.error(String(e));
+		}
+	}
 
 	let allSeries = $state<MediaWithMetadata[]>([]);
 	let isLoading = $state(true);
@@ -145,8 +154,7 @@
 							rating={item.metadata?.rating}
 							genres={item.metadata?.genres ?? []}
 							posterUrl={toAssetUrl(item.poster_path)}
-							overview={item.metadata?.overview}
-						/>
+							overview={item.metadata?.overview}						onclick={() => playMedia(item)}						/>
 					</div>
 					{/each}
 				</MediaRow>
@@ -166,8 +174,7 @@
 							runtime={ep.metadata?.runtime_minutes}
 							genres={[formatEpisode(ep)].filter(Boolean)}
 							posterUrl={toAssetUrl(ep.still_path) ?? toAssetUrl(ep.poster_path)}
-							overview={ep.metadata?.episode_overview ?? ep.metadata?.overview}
-						/>
+							overview={ep.metadata?.episode_overview ?? ep.metadata?.overview}						onclick={() => playMedia(ep)}						/>
 					</div>
 					{/each}
 				</MediaRow>

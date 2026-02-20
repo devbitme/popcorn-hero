@@ -1,6 +1,7 @@
 mod media;
 mod metadata;
 mod peer;
+mod player;
 mod user;
 mod watcher;
 
@@ -69,6 +70,7 @@ pub fn run() {
             peer::peer_connect,
             peer::peer_disconnect,
             peer::peer_list,
+            player::player_open_vlc,
         ])
         .setup(|_app| {
             log::info!("[App] Popcorn Hero started");

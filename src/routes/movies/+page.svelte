@@ -3,6 +3,7 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
 	import { onMount } from "svelte";
+	import { toast } from "svelte-sonner";
 	import MediaCard from "$lib/components/app/media-card.svelte";
 	import MediaHero from "$lib/components/app/media-hero.svelte";
 	import MediaRow from "$lib/components/app/media-row.svelte";
@@ -17,6 +18,14 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { currentUser } from "$lib/stores/user";
 	import type { MediaWithMetadata } from "$lib/types/media";
+
+	async function playMedia(item: MediaWithMetadata) {
+		try {
+			await invoke("player_open_vlc", { path: item.path });
+		} catch (e) {
+			toast.error(String(e));
+		}
+	}
 
 	let allMovies = $state<MediaWithMetadata[]>([]);
 	let isLoading = $state(true);
@@ -132,8 +141,7 @@
 							runtime={item.metadata?.runtime_minutes}
 							genres={item.metadata?.genres ?? []}
 							posterUrl={toAssetUrl(item.poster_path)}
-							overview={item.metadata?.overview}
-						/>
+							overview={item.metadata?.overview}						onclick={() => playMedia(item)}						/>
 					</div>
 				{/each}
 			</MediaRow>
@@ -154,6 +162,7 @@
 								genres={item.metadata?.genres ?? []}
 								posterUrl={toAssetUrl(item.poster_path)}
 								overview={item.metadata?.overview}
+								onclick={() => playMedia(item)}
 							/>
 						</div>
 					{/each}
